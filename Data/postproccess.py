@@ -165,9 +165,12 @@ def add_chart_to_sheet(wb, sheet_name, data_sheet, time_col, data_col, title, df
     chart.width = 20
     chart.height = 12
     
-    # Add gridlines for both axes
-    chart.x_axis.majorGridlines = ChartLines()
+    # Add only horizontal gridlines (Y-axis gridlines only)
     chart.y_axis.majorGridlines = ChartLines()
+    
+    # Ensure axes are always visible
+    chart.x_axis.delete = False
+    chart.y_axis.delete = False
     
     # Remove legend
     chart.legend = None
@@ -266,7 +269,7 @@ def process_csv_file(csv_path, selected_columns=None):
         if col in df.columns and col != 'Time (sec)':
             try:
                 col_idx = df.columns.get_loc(col) + 1
-                safe_name = col.replace('/', '_').replace('(', '').replace(')', '').replace('#', '').replace(' ', '_')[:31]
+                safe_name = col.replace('/', '_').replace('(', '').replace(')', '').replace('#', '').replace(' ', '_').replace(':', '_')[:31]
                 sheet_name = safe_name[:31]
                 
                 # Ensure unique sheet names
@@ -349,26 +352,32 @@ def main():
     
     print(f"Found {len(csv_files)} CSV file(s) to process")
     
-    # Read first CSV to get column names for selection dialog
-    first_csv = csv_files[0]
-    print(f"\nReading column names from: {first_csv.name}")
+    # Read all CSV files to get complete column list
+    print("\nScanning all CSV files for column names...")
+    all_columns_set = set()
     
-    with open(first_csv, 'r', encoding='latin-1', errors='ignore') as f:
-        lines = f.readlines()
+    for csv_file in csv_files:
+        with open(csv_file, 'r', encoding='latin-1', errors='ignore') as f:
+            lines = f.readlines()
+        
+        header_line = 0
+        for i, line in enumerate(lines):
+            if line.startswith('Time'):
+                header_line = i
+                break
+        
+        df_temp = pd.read_csv(csv_file, encoding='latin-1', skiprows=header_line, 
+                             on_bad_lines='skip', nrows=1)
+        df_temp.columns = df_temp.columns.str.strip()
+        
+        # Add valid columns to set
+        for col in df_temp.columns:
+            if all(ord(c) < 128 for c in str(col)) and col.strip():
+                all_columns_set.add(col)
     
-    header_line = 0
-    for i, line in enumerate(lines):
-        if line.startswith('Time'):
-            header_line = i
-            break
-    
-    df_sample = pd.read_csv(first_csv, encoding='latin-1', skiprows=header_line, 
-                            on_bad_lines='skip', nrows=1)
-    df_sample.columns = df_sample.columns.str.strip()
-    
-    # Remove invalid columns
-    valid_columns = [col for col in df_sample.columns 
-                     if all(ord(c) < 128 for c in str(col))]
+    # Convert to sorted list
+    valid_columns = sorted(list(all_columns_set))
+    print(f"Found {len(valid_columns)} unique columns across all files")
     
     # Show column selection dialog for individual analysis files
     print("\nStep 1: Select columns for individual analysis files")
@@ -423,7 +432,7 @@ def main():
                         print(f"  Adding sheet: {file_name} - {col}")
                         
                         # Create safe sheet name
-                        safe_name = f"{file_name}_{col}".replace('/', '_').replace('(', '').replace(')', '').replace('#', '').replace(' ', '_')[:31]
+                        safe_name = f"{file_name}_{col}".replace('/', '_').replace('(', '').replace(')', '').replace('#', '').replace(' ', '_').replace(':', '_')[:31]
                         sheet = combined_wb.create_sheet(safe_name)
                         
                         # Copy data to sheet
@@ -443,9 +452,12 @@ def main():
                         chart.width = 20
                         chart.height = 12
                         
-                        # Add gridlines for both axes
-                        chart.x_axis.majorGridlines = ChartLines()
+                        # Add only horizontal gridlines (Y-axis gridlines only)
                         chart.y_axis.majorGridlines = ChartLines()
+                        
+                        # Ensure axes are always visible
+                        chart.x_axis.delete = False
+                        chart.y_axis.delete = False
                         
                         chart.legend = None
                         
