@@ -309,12 +309,14 @@ def add_chart_to_sheet(wb, sheet_name, data_sheet, x_col, data_col, title, df, x
     chart.style = None  # Remove default styling
     chart.x_axis.title = x_col_name  # Use actual x-axis name (Time or RPM)
     chart.y_axis.title = title
-    chart.width = 20
-    chart.height = 12
+    chart.width = 25   # Very large chart to give more room for axis titles
+    chart.height = 15  # Very tall chart to give more room for axis titles
     
-    # Format X-axis to show whole numbers and reduce label density
+    # Show only ~5-6 labels across the entire x-axis (similar to y-axis)
+    chart.x_axis.tickLblSkip = max(1, len(df) // 6)  # Show roughly 6 labels total
     chart.x_axis.number_format = '0'  # Format as whole numbers (no decimals)
-    chart.x_axis.tickLblSkip = 10  # Skip every 10 labels to reduce clutter
+    chart.x_axis.majorTickMark = "in"  # Add inside tick marks
+    chart.x_axis.tickLblPos = "low"  # Position labels below axis
     
     # Add only horizontal gridlines (Y-axis gridlines only)
     chart.y_axis.majorGridlines = ChartLines()
@@ -471,7 +473,7 @@ def process_csv_file(csv_path, selected_columns=None, scaling_factors=None, x_ax
     # Save workbook
     wb.save(output_path)
     print(f"  ✓ Saved: {output_path}")
-    print(f"  ✓ Created {chart_count} chart sheets\n")
+    print(f"  ✓ Created {chart_count} total chart sheets\n")
     
     # Return dataframe for combined workbook creation
     return df
@@ -594,6 +596,202 @@ def ask_yes_no(question):
     
     return answer
 
+def select_multiline_columns_dialog(columns):
+    """
+    Create a dialog for selecting columns to combine on one chart
+    
+    Returns:
+        List of column lists (each sub-list represents one multi-line chart)
+    """
+    combined_groups = []
+    current_group = []
+    
+    def on_add_to_group():
+        nonlocal current_group
+        for col, var in checkboxes.items():
+            if var.get():
+                current_group.append(col)
+                var.set(False)
+        update_group_display()
+    
+    def on_finish_group():
+        nonlocal current_group, combined_groups
+        if current_group:
+            combined_groups.append(current_group[:])
+            current_group = []
+            update_group_display()
+    
+    def on_done():
+        nonlocal current_group, combined_groups
+        if current_group:
+            combined_groups.append(current_group[:])
+        root.quit()
+        root.destroy()
+    
+    def update_group_display():
+        group_text.delete(1.0, tk.END)
+        if current_group:
+            group_text.insert(tk.END, "Current group:\n" + "\n".join(current_group) + "\n\n")
+        if combined_groups:
+            for i, group in enumerate(combined_groups):
+                group_text.insert(tk.END, f"Chart {i+1}:\n" + "\n".join(group) + "\n\n")
+    
+    root = tk.Tk()
+    root.title("Create Multi-Line Charts")
+    root.geometry("800x700")
+    
+    # Instructions
+    inst_label = tk.Label(root, text="Select columns to combine on one chart, then click 'Finish Chart'.\nRepeat for each multi-line chart you want.",
+                         font=("Arial", 10))
+    inst_label.pack(pady=10)
+    
+    # Main frame with two columns
+    main_frame = tk.Frame(root)
+    main_frame.pack(fill="both", expand=True, padx=10, pady=5)
+    
+    # Left side - column selection
+    left_frame = tk.Frame(main_frame)
+    left_frame.pack(side=tk.LEFT, fill="both", expand=True, padx=5)
+    
+    tk.Label(left_frame, text="Available Columns:", font=("Arial", 10, "bold")).pack()
+    
+    canvas = tk.Canvas(left_frame)
+    scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=canvas.yview)
+    scrollable_frame = ttk.Frame(canvas)
+    
+    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    checkboxes = {}
+    for col in columns:
+        if col != 'Time (sec)':
+            var = tk.BooleanVar(value=False)
+            checkboxes[col] = var
+            cb = ttk.Checkbutton(scrollable_frame, text=col, variable=var)
+            cb.pack(anchor='w', padx=10, pady=2)
+    
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Buttons
+    btn_frame = tk.Frame(left_frame)
+    btn_frame.pack(pady=10)
+    
+    add_btn = tk.Button(btn_frame, text="Add Selected to Chart", command=on_add_to_group,
+                       bg="blue", fg="white", font=("Arial", 9, "bold"))
+    add_btn.pack(side=tk.LEFT, padx=5)
+    
+    finish_btn = tk.Button(btn_frame, text="Finish Chart", command=on_finish_group,
+                          bg="orange", fg="white", font=("Arial", 9, "bold"))
+    finish_btn.pack(side=tk.LEFT, padx=5)
+    
+    # Right side - groups display
+    right_frame = tk.Frame(main_frame)
+    right_frame.pack(side=tk.RIGHT, fill="both", expand=True, padx=5)
+    
+    tk.Label(right_frame, text="Charts to Create:", font=("Arial", 10, "bold")).pack()
+    
+    group_text = tk.Text(right_frame, width=40, height=30, font=("Arial", 9))
+    group_text.pack(fill="both", expand=True)
+    
+    # Done button
+    done_btn = tk.Button(root, text="Done - Create These Charts", command=on_done,
+                        bg="green", fg="white", font=("Arial", 10, "bold"))
+    done_btn.pack(pady=10)
+    
+    root.mainloop()
+    
+    return combined_groups
+
+def add_multiline_chart_to_sheet(wb, sheet_name, data_sheet, x_col_name, columns, df, title="Multi-Line Chart"):
+    """
+    Add a multi-line color-coded chart to a sheet with auto-normalization
+    
+    Args:
+        wb: Workbook object
+        sheet_name: Name for the chart sheet
+        data_sheet: Sheet containing the data
+        x_col_name: Name of x-axis column
+        columns: List of column names to include as separate lines
+        df: DataFrame containing the data
+        title: Chart title
+    """
+    # Define color palette (hex colors)
+    colors = ["FF0000", "0000FF", "00FF00", "FFA500", "800080", "FF00FF", 
+              "00FFFF", "FFD700", "8B4513", "000080", "008000", "FF1493"]
+    
+    # Create new sheet for chart
+    chart_sheet = wb.create_sheet(sheet_name)
+    
+    # Copy X-axis data
+    chart_sheet.cell(1, 1, x_col_name)
+    for idx, x_val in enumerate(df[x_col_name], start=2):
+        chart_sheet.cell(idx, 1, x_val)
+    
+    # Normalize and copy each column's data
+    for col_idx, col_name in enumerate(columns, start=2):
+        # Get original data
+        col_data = df[col_name]
+        
+        # Normalize to 0-100 scale for visual comparison
+        min_val = col_data.min()
+        max_val = col_data.max()
+        
+        if max_val - min_val > 0:
+            # Normalize to 0-100 range
+            normalized_data = 100 * (col_data - min_val) / (max_val - min_val)
+        else:
+            normalized_data = col_data
+        
+        # Add column header with original range info
+        chart_sheet.cell(1, col_idx, f"{col_name} [{min_val:.1f}-{max_val:.1f}]")
+        
+        # Copy normalized data
+        for idx, data_val in enumerate(normalized_data, start=2):
+            chart_sheet.cell(idx, col_idx, data_val)
+    
+    # Create chart
+    chart = LineChart()
+    chart.title = title + " (Normalized)"
+    chart.style = None
+    chart.x_axis.title = x_col_name
+    chart.y_axis.title = "Normalized Values (0-100)"
+    chart.width = 25
+    chart.height = 15
+    
+    # Configure X-axis
+    chart.x_axis.tickLblSkip = max(1, len(df) // 6)
+    chart.x_axis.number_format = '0'
+    chart.x_axis.majorTickMark = "in"
+    chart.x_axis.tickLblPos = "low"
+    
+    # Add gridlines
+    chart.y_axis.majorGridlines = ChartLines()
+    
+    # Ensure axes visible
+    chart.x_axis.delete = False
+    chart.y_axis.delete = False
+    
+    # Add data series for each column
+    x_values = Reference(chart_sheet, min_col=1, min_row=2, max_row=len(df)+1)
+    
+    for col_idx, col_name in enumerate(columns):
+        y_values = Reference(chart_sheet, min_col=col_idx+2, min_row=1, max_row=len(df)+1)
+        chart.add_data(y_values, titles_from_data=True)
+        
+        # Color code each line
+        if chart.series:
+            series_idx = len(chart.series) - 1
+            color = colors[series_idx % len(colors)]
+            chart.series[series_idx].graphicalProperties.line.solidFill = color
+            chart.series[series_idx].smooth = True
+    
+    chart.set_categories(x_values)
+    
+    # Add chart to sheet
+    chart_sheet.add_chart(chart, "D2")
+
 def main():
     """
     Main function to process all CSV files in the Data directory
@@ -675,6 +873,73 @@ def main():
                 all_dataframes.append((csv_file.stem, df))
         except Exception as e:
             print(f"ERROR processing {csv_file}: {e}\n")
+    
+    # Ask if user wants to create multi-line charts for individual files
+    print("\nStep 1.5: Multi-line charts for individual files")
+    create_multiline_individual = ask_yes_no("Create multi-line color-coded charts for individual files?")
+    
+    if create_multiline_individual:
+        # Let user select which files to create multi-line charts for
+        print("Opening file selection dialog...")
+        analysis_files = list(script_dir.glob("*_analysis.xlsx"))
+        
+        if analysis_files:
+            selected_multiline_files = select_files_dialog(analysis_files,
+                                                          "Select files to add multi-line charts to:")
+            
+            if selected_multiline_files:
+                print("Opening multi-line chart selection dialog...")
+                multiline_groups = select_multiline_columns_dialog(selected_columns)
+                
+                if multiline_groups:
+                    print(f"\nAdding multi-line charts to {len(selected_multiline_files)} file(s)...")
+                    
+                    for excel_file in selected_multiline_files:
+                        try:
+                            # Load the workbook and dataframe
+                            from openpyxl import load_workbook
+                            wb = load_workbook(excel_file)
+                            df = pd.read_excel(excel_file, sheet_name="Raw Data")
+                            
+                            print(f"  Adding to: {excel_file.name}")
+                            chart_count = 0
+                            
+                            for x_axis in x_axis_individual:
+                                if x_axis not in df.columns:
+                                    continue
+                                
+                                x_suffix = "_Time" if x_axis == "Time (sec)" else "_RPM"
+                                
+                                for group_columns in multiline_groups:
+                                    valid_group_cols = [col for col in group_columns 
+                                                       if col in df.columns and col not in x_axis_individual]
+                                    
+                                    if valid_group_cols:
+                                        chart_name = "_".join([c[:5] for c in valid_group_cols[:3]])
+                                        if len(x_axis_individual) > 1:
+                                            safe_name = f"Multi_{chart_name}{x_suffix}"[:31]
+                                        else:
+                                            safe_name = f"Multi_{chart_name}"[:31]
+                                        
+                                        base_name = safe_name
+                                        counter = 1
+                                        while safe_name in wb.sheetnames:
+                                            safe_name = f"{base_name[:28]}_{counter}"
+                                            counter += 1
+                                        
+                                        title = f"Combined: {', '.join(valid_group_cols[:3])}"
+                                        if len(valid_group_cols) > 3:
+                                            title += f" (+{len(valid_group_cols)-3} more)"
+                                        
+                                        add_multiline_chart_to_sheet(wb, safe_name, None, x_axis,
+                                                                    valid_group_cols, df, title)
+                                        chart_count += 1
+                            
+                            wb.save(excel_file)
+                            print(f"    ✓ Added {chart_count} multi-line chart(s)")
+                            
+                        except Exception as e:
+                            print(f"  Error adding charts to {excel_file.name}: {e}")
     
     # Ask if user wants combined workbook
     print("\nStep 2: Combined workbook")
@@ -819,8 +1084,14 @@ def main():
                                             chart.style = None
                                             chart.x_axis.title = x_axis
                                             chart.y_axis.title = col
-                                            chart.width = 20
-                                            chart.height = 12
+                                            chart.width = 25   # Very large chart to give more room for axis titles
+                                            chart.height = 15  # Very tall chart to give more room for axis titles
+                                            
+                                            # Show only ~5-6 labels across the entire x-axis (similar to y-axis)
+                                            chart.x_axis.tickLblSkip = max(1, len(df) // 6)  # Show roughly 6 labels total
+                                            chart.x_axis.number_format = '0'  # Format as whole numbers (no decimals)
+                                            chart.x_axis.majorTickMark = "in"  # Add inside tick marks
+                                            chart.x_axis.tickLblPos = "low"  # Position labels below axis
                                             
                                             # Add only horizontal gridlines (Y-axis gridlines only)
                                             chart.y_axis.majorGridlines = ChartLines()
@@ -847,11 +1118,76 @@ def main():
                                             
                                             chart_count += 1
                         
+                            # Ask if user wants multi-line charts in combined workbook
+                            print("\n  Do you want to create multi-line color-coded charts in combined workbook?")
+                            create_multiline_combined = ask_yes_no("Create multi-line charts for combined workbook?")
+                            
+                            if create_multiline_combined:
+                                # Let user select which files to use for multi-line charts
+                                print("  Select which file(s) to use for multi-line charts...")
+                                file_dict = {f"{name}": (name, df) for name, df in excel_dataframes}
+                                selected_multiline_files = select_files_dialog(
+                                    [Path(name + "_analysis.xlsx") for name in file_dict.keys()],
+                                    "Select files to use for multi-line charts:")
+                                
+                                if selected_multiline_files:
+                                    # Get the dataframes for selected files
+                                    selected_df_data = [(file_dict[f.stem.replace('_analysis', '')][0], 
+                                                        file_dict[f.stem.replace('_analysis', '')][1]) 
+                                                       for f in selected_multiline_files 
+                                                       if f.stem.replace('_analysis', '') in file_dict]
+                                    
+                                    print("  Opening multi-line chart selection dialog...")
+                                    multiline_groups_combined = select_multiline_columns_dialog(combined_columns)
+                                    
+                                    if multiline_groups_combined:
+                                        print(f"  Creating {len(multiline_groups_combined)} multi-line chart(s)...")
+                                        
+                                        for x_axis in available_x_axes_combined:
+                                            x_suffix = "_Time" if x_axis == "Time (sec)" else "_RPM"
+                                            
+                                            for file_name, df in selected_df_data:
+                                                if x_axis not in df.columns:
+                                                    continue
+                                                
+                                                for group_idx, group_columns in enumerate(multiline_groups_combined):
+                                                    # Filter columns that exist in this dataframe
+                                                    valid_group_cols = [col for col in group_columns 
+                                                                       if col in df.columns and col not in x_axis_combined]
+                                                    
+                                                    if valid_group_cols:
+                                                        # Create chart name
+                                                        chart_name = "_".join([c[:5] for c in valid_group_cols[:3]])
+                                                        if len(available_x_axes_combined) > 1:
+                                                            safe_name = f"{file_name}_Multi_{chart_name}{x_suffix}"[:31]
+                                                        else:
+                                                            safe_name = f"{file_name}_Multi_{chart_name}"[:31]
+                                                        
+                                                        # Ensure unique sheet names
+                                                        base_name = safe_name
+                                                        counter = 1
+                                                        while safe_name in combined_wb.sheetnames:
+                                                            safe_name = f"{base_name[:28]}_{counter}"
+                                                            counter += 1
+                                                        
+                                                        try:
+                                                            title = f"{file_name} - Combined: {', '.join(valid_group_cols[:3])}"
+                                                            if len(valid_group_cols) > 3:
+                                                                title += f" (+{len(valid_group_cols)-3} more)"
+                                                            
+                                                            # Use the normalized version
+                                                            add_multiline_chart_to_sheet(combined_wb, safe_name, None, x_axis, 
+                                                                                        valid_group_cols, df, title)
+                                                            chart_count += 1
+                                                            print(f"    Created: {title}")
+                                                        except Exception as e:
+                                                            print(f"    Warning: Could not create multi-line chart: {e}")
+                            
                             # Save combined workbook
                             combined_path = script_dir / f"{combined_name}.xlsx"
                             combined_wb.save(combined_path)
                             print(f"\n  ✓ Saved combined workbook: {combined_path}")
-                            print(f"  ✓ Created {chart_count} sheets\n")
+                            print(f"  ✓ Created {chart_count} total sheets\n")
     
     print("=" * 60)
     print("Processing complete!")
