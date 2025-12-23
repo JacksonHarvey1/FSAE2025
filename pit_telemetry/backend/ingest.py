@@ -20,7 +20,16 @@ from typing import Dict, Optional, IO
 
 import serial  # type: ignore
 
-from .config import settings
+try:
+    # When imported as part of the pit_telemetry package
+    from .config import settings
+except ImportError:  # pragma: no cover - fallback for "python ingest.py"
+    # When run as a standalone script, use an absolute import
+    import os
+    import sys
+
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from pit_telemetry.backend.config import settings
 
 
 @dataclass
@@ -284,4 +293,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("[ingest] Stopping")
         ing.stop()
-

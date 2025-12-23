@@ -22,8 +22,17 @@ from typing import Any, Dict
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from .config import settings
-from .ingest import SerialIngestor
+try:
+    # Package-relative imports when run as part of pit_telemetry
+    from .config import settings
+    from .ingest import SerialIngestor
+except ImportError:  # pragma: no cover - fallback for "python app.py"
+    import os
+    import sys
+
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from pit_telemetry.backend.config import settings
+    from pit_telemetry.backend.ingest import SerialIngestor
 
 
 ingestor = SerialIngestor()
@@ -93,4 +102,3 @@ def stream() -> Response:
 if __name__ == "__main__":
     # Simple dev server entrypoint
     app.run(host="0.0.0.0", port=8000, debug=True)
-
