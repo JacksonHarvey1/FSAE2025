@@ -23,13 +23,16 @@ import serial  # type: ignore
 try:
     # When imported as part of the pit_telemetry package
     from .config import settings
-except ImportError:  # pragma: no cover - fallback for "python ingest.py"
-    # When run as a standalone script, use an absolute import
+except ImportError:  # pragma: no cover - fallback for "python backend/ingest.py"
+    # When run as a standalone script from inside pit_telemetry/, treat
+    # backend/ as the import root so we can simply "import config".
     import os
     import sys
 
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from pit_telemetry.backend.config import settings
+    backend_dir = os.path.dirname(__file__)  # .../pit_telemetry/backend
+    if backend_dir not in sys.path:
+        sys.path.append(backend_dir)
+    from config import settings
 
 
 @dataclass
