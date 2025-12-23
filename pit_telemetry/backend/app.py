@@ -46,6 +46,12 @@ def index() -> str:
     return render_template("index.html")
 
 
+@app.route("/graphs")
+def graphs() -> str:
+    """Page with live time-series graphs (RPM, MAP, temps, etc.)."""
+    return render_template("graphs.html")
+
+
 @app.route("/api/latest")
 def api_latest() -> Response:
     latest = ingestor.latest()

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>FSAE Telemetry Graphs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <style>
+      main { padding-bottom: 2rem; }
+      canvas { background: #111; border: 1px solid #333; border-radius: 4px; }
+      .chart-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+      @media (min-width: 1000px) {
+        .chart-grid { grid-template-columns: 1fr 1fr; }
+      }
+      .nav {
+        margin-left: 1rem;
+        font-size: 0.8rem;
+      }
+      .nav a {
+        color: #9cf;
+        text-decoration: none;
+        margin-right: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>FSAE Telemetry - Live Graphs</h1>
+      <div class="nav">
+        <a href="{{ url_for('index') }}">Live Values</a>
+        <a href="{{ url_for('graphs') }}">Graphs</a>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>Engine & Pressures (vs Time)</h2>
+        <div class="chart-grid">
+          <div>
+            <h3>RPM</h3>
+            <canvas id="chart_rpm" width="400" height="200"></canvas>
+          </div>
+          <div>
+            <h3>MAP (kPa)</h3>
+            <canvas id="chart_map" width="400" height="200"></canvas>
+          </div>
+          <div>
+            <h3>Oil Pressure (PSI)</h3>
+            <canvas id="chart_oil" width="400" height="200"></canvas>
+          </div>
+          <div>
+            <h3>Coolant / Air Temp (°C)</h3>
+            <canvas id="chart_temp" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <small>Live graphs built from the same JSON stream as /stream. For long-term history and comparisons, Grafana will query a time-series DB populated by this ingestor.</small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='graphs.js') }}"></script>
+  </body>
+  </html>
+
