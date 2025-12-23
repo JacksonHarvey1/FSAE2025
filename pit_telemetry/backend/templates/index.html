@@ -11,6 +11,10 @@
       <div id="status">
         <span id="health-text">Connecting...</span>
       </div>
+      <div class="nav">
+        <a href="{{ url_for('index') }}">Live Values</a>
+        <a href="{{ url_for('graphs') }}">Graphs</a>
+      </div>
     </header>
 
     <main>
@@ -46,4 +50,3 @@
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
   </html>
-
