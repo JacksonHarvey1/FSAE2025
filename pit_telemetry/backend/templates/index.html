@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>FSAE Pit Telemetry</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <header>
+      <h1>FSAE Pit Telemetry</h1>
+      <div id="status">
+        <span id="health-text">Connecting...</span>
+      </div>
+    </header>
+
+    <main>
+      <section id="engine">
+        <h2>Engine</h2>
+        <div class="grid">
+          <div class="card"><span class="label">RPM</span><span id="rpm" class="value">--</span></div>
+          <div class="card"><span class="label">TPS %</span><span id="tps_pct" class="value">--</span></div>
+          <div class="card"><span class="label">MAP kPa</span><span id="map_kpa" class="value">--</span></div>
+          <div class="card"><span class="label">Lambda</span><span id="lambda" class="value">--</span></div>
+          <div class="card"><span class="label">Oil PSI</span><span id="oil_psi" class="value">--</span></div>
+          <div class="card"><span class="label">Coolant &deg;C</span><span id="coolant_c" class="value">--</span></div>
+          <div class="card"><span class="label">Air &deg;C</span><span id="air_c" class="value">--</span></div>
+          <div class="card"><span class="label">Batt V</span><span id="batt_v" class="value">--</span></div>
+        </div>
+      </section>
+
+      <section id="wheels">
+        <h2>Wheel Speeds (Hz)</h2>
+        <div class="grid">
+          <div class="card"><span class="label">FL</span><span id="ws_fl_hz" class="value">--</span></div>
+          <div class="card"><span class="label">FR</span><span id="ws_fr_hz" class="value">--</span></div>
+          <div class="card"><span class="label">BL</span><span id="ws_bl_hz" class="value">--</span></div>
+          <div class="card"><span class="label">BR</span><span id="ws_br_hz" class="value">--</span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <small>JSON stream from RP2040 &mdash; see /api/health for details.</small>
+    </footer>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+  </html>
+
