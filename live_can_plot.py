@@ -185,7 +185,16 @@ def main() -> None:
         nonlocal last_print
 
         now = time.time()
+        last_pkt_id = None
+
+        # inside update()
         pkt = reader.latest
+        pkt_id = pkt.get("pkt")
+
+        if pkt and pkt_id is not None and pkt_id != last_pkt_id:
+            last_pkt_id = pkt_id
+    # append values to deque here
+
 
         # Only append if we have something fresh-ish
         if pkt and (now - reader.latest_rx_time) < 2.0:

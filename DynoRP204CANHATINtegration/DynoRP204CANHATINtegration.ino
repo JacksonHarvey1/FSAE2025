@@ -32,6 +32,11 @@ static constexpr uint8_t CAN_INT   = PIN_CAN_INTERRUPT;
 static constexpr uint8_t CAN_STBY  = PIN_CAN_STANDBY;
 static constexpr uint8_t CAN_RESET = PIN_CAN_RESET;
 
+static bool     g_seen_any_can = false;
+static uint32_t g_last_id = 0;
+static bool     g_last_ext = false;
+static uint8_t  g_last_dlc = 0;
+
 // Red LED on this Feather (D13)
 #ifndef PIN_LED
   #define PIN_LED LED_BUILTIN
@@ -147,13 +152,12 @@ void updateTelemetryFromFrame(uint32_t id, bool ext, uint8_t dlc, const uint8_t 
 
 // Emit one line of NDJSON telemetry representing the latest snapshot.
 void sendTelemetryJson() {
-  if (!g_seen_any_frame) return;
+  if (!g_seen_any_can) return;   // <-- change from g_seen_any_frame
 
   g_pkt_counter++;
   uint32_t ts = millis();
 
   Serial.print('{');
-
   bool first = true;
   auto add_kv = [&](const char *key) {
     if (!first) Serial.print(',');
@@ -167,6 +171,13 @@ void sendTelemetryJson() {
   add_kv("src");     Serial.print("\"can\"");
   add_kv("node_id"); Serial.print(1);
 
+  // ---- Debug fields so we can verify the library is reporting EXT/DLC correctly
+  add_kv("last_id");  Serial.print(g_last_id);
+  add_kv("last_ext"); Serial.print(g_last_ext ? 1 : 0);
+  add_kv("last_dlc"); Serial.print(g_last_dlc);
+  add_kv("seen_an400"); Serial.print(g_seen_any_frame ? 1 : 0);
+
+  // ---- Your decoded fields (will stay at defaults until AN400 frames decode)
   add_kv("rpm");      Serial.print(g_rpm);
   add_kv("tps_pct");  Serial.print(g_tps_pct, 1);
   add_kv("fot_ms");   Serial.print(g_fot_ms, 1);
@@ -255,22 +266,24 @@ void loop() {
     bool rtr = CAN.packetRtr();
     uint8_t dlc = (uint8_t)CAN.packetDlc();
 
+    g_seen_any_can = true;
+    g_last_id = id;
+    g_last_ext = ext;
+    g_last_dlc = dlc;
+
     uint8_t data[8] = {0};
     if (!rtr) {
       uint8_t i = 0;
-      while (CAN.available() && i < 8) {
-        data[i++] = (uint8_t)CAN.read();
-      }
+      while (CAN.available() && i < 8) data[i++] = (uint8_t)CAN.read();
     } else {
-      // consume any bytes if present (shouldn't be for RTR)
       while (CAN.available()) (void)CAN.read();
     }
 
     frameCountThisSec++;
 
-    // Update snapshot from known IDs
     if (!rtr) updateTelemetryFromFrame(id, ext, dlc, data);
   }
+
 
   // Periodic status (optional, 1 Hz)
   if (now - lastStat >= STAT_PERIOD_MS) {
