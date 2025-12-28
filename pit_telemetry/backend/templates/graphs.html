@@ -33,25 +33,14 @@
 
     <main>
       <section>
-        <h2>Engine & Pressures (vs Time)</h2>
-        <div class="chart-grid">
-          <div>
-            <h3>RPM</h3>
-            <canvas id="chart_rpm" width="400" height="200"></canvas>
-          </div>
-          <div>
-            <h3>MAP (kPa)</h3>
-            <canvas id="chart_map" width="400" height="200"></canvas>
-          </div>
-          <div>
-            <h3>Oil Pressure (PSI)</h3>
-            <canvas id="chart_oil" width="400" height="200"></canvas>
-          </div>
-          <div>
-            <h3>Coolant / Air Temp (°C)</h3>
-            <canvas id="chart_temp" width="400" height="200"></canvas>
-          </div>
-        </div>
+        <h2>Signals</h2>
+        <p>Select which channels to plot. Each checked signal gets its own small chart below.</p>
+        <div id="channel-checkboxes" class="channel-list"></div>
+      </section>
+
+      <section>
+        <h2>Live Graphs (vs Time)</h2>
+        <div id="charts-container" class="chart-grid"></div>
       </section>
     </main>
 
@@ -63,4 +52,3 @@
     <script src="{{ url_for('static', filename='graphs.js') }}"></script>
   </body>
   </html>
-

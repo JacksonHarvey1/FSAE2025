@@ -1,4 +1,4 @@
-// graphs.js - live time-series charts driven by the /stream SSE endpoint.
+// graphs.js - dynamic live time-series charts driven by the /stream SSE endpoint.
 
 function makeChart(ctx, label, color) {
   return new Chart(ctx, {
@@ -35,57 +35,158 @@ function makeChart(ctx, label, color) {
   });
 }
 
+// Simple color palette for channels
+const COLORS = [
+  'rgb(0, 200, 255)',
+  'rgb(0, 255, 120)',
+  'rgb(255, 200, 0)',
+  'rgb(255, 80, 80)',
+  'rgb(200, 150, 255)',
+  'rgb(150, 255, 200)',
+  'rgb(255, 150, 150)',
+  'rgb(200, 200, 200)',
+];
+
+function pickColor(index) {
+  return COLORS[index % COLORS.length];
+}
+
 window.addEventListener('load', () => {
-  const ctxRpm  = document.getElementById('chart_rpm')?.getContext('2d');
-  const ctxMap  = document.getElementById('chart_map')?.getContext('2d');
-  const ctxOil  = document.getElementById('chart_oil')?.getContext('2d');
-  const ctxTemp = document.getElementById('chart_temp')?.getContext('2d');
+  const checkboxContainer = document.getElementById('channel-checkboxes');
+  const chartsContainer = document.getElementById('charts-container');
+  if (!checkboxContainer || !chartsContainer) return;
 
-  if (!ctxRpm || !ctxMap || !ctxOil || !ctxTemp) return;
-
-  const chartRpm  = makeChart(ctxRpm,  'RPM',          'rgb(0, 200, 255)');
-  const chartMap  = makeChart(ctxMap,  'MAP (kPa)',    'rgb(0, 255, 120)');
-  const chartOil  = makeChart(ctxOil,  'Oil PSI',      'rgb(255, 200, 0)');
-  const chartTemp = makeChart(ctxTemp, 'Temp (°C)',    'rgb(255, 80, 80)');
-
-  const MAX_POINTS = 300; // roughly 30s if we sample ~10 Hz
+  const MAX_POINTS = 400; // sliding window (~20–40s depending on rate)
   let t0 = null;
 
-  function pushPoint(chart, tSec, value) {
-    if (!chart || value === undefined || value === null || Number.isNaN(value)) return;
-    const data = chart.data;
-    data.labels.push(tSec);
-    data.datasets[0].data.push(value);
-    // Keep sliding window
-    if (data.labels.length > MAX_POINTS) {
-      data.labels.shift();
-      data.datasets[0].data.shift();
+  // Map: channel name -> { enabled, chart, labels, values, canvasDiv }
+  const channels = new Map();
+
+  function ensureChannelEntry(name) {
+    if (!channels.has(name)) {
+      channels.set(name, {
+        enabled: false,
+        chart: null,
+        labels: [],
+        values: [],
+        canvasDiv: null,
+      });
     }
+    return channels.get(name);
+  }
+
+  function createCheckbox(name, idx) {
+    const wrapper = document.createElement('label');
+    wrapper.style.display = 'inline-block';
+    wrapper.style.marginRight = '1rem';
+    wrapper.style.marginBottom = '0.5rem';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = name;
+
+    const span = document.createElement('span');
+    span.textContent = ` ${name}`;
+
+    wrapper.appendChild(cb);
+    wrapper.appendChild(span);
+    checkboxContainer.appendChild(wrapper);
+
+    const channel = ensureChannelEntry(name);
+
+    cb.addEventListener('change', () => {
+      channel.enabled = cb.checked;
+
+      if (cb.checked) {
+        // Create chart container + canvas
+        if (!channel.canvasDiv) {
+          const div = document.createElement('div');
+          const title = document.createElement('h3');
+          title.textContent = name;
+          const canvas = document.createElement('canvas');
+          canvas.width = 400;
+          canvas.height = 200;
+
+          div.appendChild(title);
+          div.appendChild(canvas);
+          chartsContainer.appendChild(div);
+
+          const ctx = canvas.getContext('2d');
+          channel.chart = makeChart(ctx, name, pickColor(idx));
+          channel.canvasDiv = div;
+        }
+      } else {
+        // Destroy chart & remove DOM
+        if (channel.chart) {
+          channel.chart.destroy();
+          channel.chart = null;
+        }
+        if (channel.canvasDiv && channel.canvasDiv.parentNode) {
+          channel.canvasDiv.parentNode.removeChild(channel.canvasDiv);
+        }
+        channel.canvasDiv = null;
+        channel.labels = [];
+        channel.values = [];
+      }
+    });
+  }
+
+  function buildChannelListFromSample(sample) {
+    // Called once on first sample to populate checkboxes.
+    const ignoreKeys = new Set(['ts_ms', 'pi_ts_ms', 'pkt', 'src', 'node_id']);
+    const keys = Object.keys(sample)
+      .filter((k) => !ignoreKeys.has(k) && typeof sample[k] === 'number')
+      .sort();
+
+    keys.forEach((name, idx) => {
+      ensureChannelEntry(name);
+      createCheckbox(name, idx);
+    });
+  }
+
+  function pushPointToChannel(name, tSec, value) {
+    const channel = channels.get(name);
+    if (!channel || !channel.enabled || channel.chart == null) return;
+    if (value === undefined || value === null || Number.isNaN(value)) return;
+
+    channel.labels.push(tSec);
+    channel.values.push(value);
+
+    if (channel.labels.length > MAX_POINTS) {
+      channel.labels.shift();
+      channel.values.shift();
+    }
+
+    const chart = channel.chart;
+    chart.data.labels = channel.labels.slice();
+    chart.data.datasets[0].data = channel.values.slice();
     chart.update('none');
   }
 
   const es = new EventSource('/stream');
+  let initializedChannels = false;
 
   es.onmessage = (evt) => {
     try {
       const t = JSON.parse(evt.data);
-      const ts = (t.ts_ms ?? null);
+      const ts = t.ts_ms ?? null;
       if (ts == null) return;
       if (t0 === null) t0 = ts;
       const tSec = ((ts - t0) / 1000).toFixed(1);
 
-      pushPoint(chartRpm,  tSec, typeof t.rpm === 'number' ? t.rpm : null);
-      pushPoint(chartMap,  tSec, typeof t.map_kpa === 'number' ? t.map_kpa : null);
-      pushPoint(chartOil,  tSec, typeof t.oil_psi === 'number' ? t.oil_psi : null);
+      if (!initializedChannels) {
+        buildChannelListFromSample(t);
+        initializedChannels = true;
+      }
 
-      // For temp chart, prefer coolant but also show air if present
-      const tempVal = typeof t.coolant_c === 'number'
-        ? t.coolant_c
-        : (typeof t.air_c === 'number' ? t.air_c : null);
-      pushPoint(chartTemp, tSec, tempVal);
+      channels.forEach((info, name) => {
+        const v = t[name];
+        if (typeof v === 'number') {
+          pushPointToChannel(name, tSec, v);
+        }
+      });
     } catch (e) {
       console.error('Bad telemetry JSON in graphs', e);
     }
   };
 });
-

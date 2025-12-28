@@ -66,6 +66,9 @@ class SerialIngestor:
         self._serial: Optional[serial.Serial] = None
         self._stop = threading.Event()
 
+        # Synthetic packet counter for non-JSON sources (e.g. raw CAN CSV)
+        self._synthetic_pkt_counter: int = 0
+
         # Run management / logging
         self._run_id: Optional[str] = None
         self._run_log_fh: Optional[IO[str]] = None
@@ -193,6 +196,17 @@ class SerialIngestor:
                 print(line)
                 continue
 
+            # Legacy/raw CAN format from older RP2040 sketches:
+            #   CAN,<ts_ms>,<id_hex>,<ext>,<dlc>,<b0>,...,<b7>
+            # We decode these into the same JSON-style dict the rest of
+            # the app expects so that existing firmware can be used
+            # without changes.
+            if line.startswith("CAN,"):
+                pkt = self._parse_can_csv_line(line)
+                if pkt:
+                    self._handle_packet(pkt)
+                continue
+
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
@@ -230,6 +244,144 @@ class SerialIngestor:
 
             if self._run_csv_fh:
                 self._write_csv_row(pkt)
+
+    # --------- helpers: legacy CAN CSV decoding ---------
+
+    def _parse_can_csv_line(self, line: str) -> Optional[Dict[str, float]]:
+        """Parse one legacy CAN CSV line from the RP2040.
+
+        Expected format (from RP2040comm.py and older sketches)::
+
+            CAN,<ts_ms>,<id_hex>,<ext>,<dlc>,<b0>,<b1>,...,<b7>
+
+        Returns a partial telemetry dict using the same field names as the
+        NDJSON firmware (rpm, tps_pct, map_kpa, etc.), plus ts_ms/src/node_id/pkt.
+        """
+
+        parts = line.split(",")
+        if len(parts) != 13:
+            return None
+
+        try:
+            ts_ms_str = parts[1]
+            ts_ms = int(ts_ms_str)
+            arb_id_str = parts[2]
+            arb_id = int(arb_id_str, 16)
+            # ext = int(parts[3])  # currently unused
+            dlc = int(parts[4])
+            bytes_raw = [int(b) & 0xFF for b in parts[5:13]]
+        except ValueError:
+            return None
+
+        # Slice to DLC bytes; pad/truncate to 8 for safety
+        data = bytes(bytes_raw[:dlc] + [0] * (8 - dlc))
+
+        # Helpers matching the AN400 firmware decoding
+        def u16_lohi(lo: int, hi: int) -> int:
+            return (hi << 8) | lo
+
+        def s16_lohi(lo: int, hi: int) -> int:
+            n = u16_lohi(lo, hi)
+            return n - 65536 if n > 32767 else n
+
+        # AN400 IDs (same as in CAN_to_Pi_USB.ino)
+        ID_PE1 = 0x0CFFF048  # RPM, TPS, Fuel Open Time, Ign Angle
+        ID_PE2 = 0x0CFFF148  # Barometer, MAP, Lambda, Pressure Type
+        ID_PE3 = 0x0CFFF248  # Oil pressure etc.
+        ID_PE5 = 0x0CFFF448  # Wheel speeds
+        ID_PE6 = 0x0CFFF548  # Battery, Air Temp, Coolant
+        ID_PE9 = 0x0CFFF848  # Lambda & AFR
+
+        pkt: Dict[str, float] = {}
+
+        # Ensure we always provide a timestamp and metadata; contents will
+        # be merged into the latest snapshot in _handle_packet().
+        self._synthetic_pkt_counter += 1
+        pkt["ts_ms"] = ts_ms
+        pkt["pkt"] = float(self._synthetic_pkt_counter)
+        pkt["src"] = "can"
+        pkt["node_id"] = 1.0
+
+        # Dispatch based on arbitration ID
+        b = list(data)
+
+        if arb_id == ID_PE1 and len(b) >= 8:
+            # Engine basics
+            rpm = u16_lohi(b[0], b[1])              # 1 rpm/bit
+            tps = s16_lohi(b[2], b[3]) * 0.1        # %
+            fot = s16_lohi(b[4], b[5]) * 0.1        # ms
+            ign = s16_lohi(b[6], b[7]) * 0.1        # deg
+
+            pkt["rpm"] = float(rpm)
+            pkt["tps_pct"] = float(tps)
+            pkt["fot_ms"] = float(fot)
+            pkt["ign_deg"] = float(ign)
+
+        elif arb_id == ID_PE2 and len(b) >= 8:
+            # Barometer, MAP, lambda, and pressure unit bit
+            baro_raw = s16_lohi(b[0], b[1]) * 0.01  # psi or kPa
+            map_raw = s16_lohi(b[2], b[3]) * 0.01   # psi or kPa
+            lam_raw = s16_lohi(b[4], b[5]) * 0.01   # lambda
+            kpa = (b[6] & 0x01) != 0                # pressure type bit
+
+            if kpa:
+                baro_kpa = baro_raw
+                map_kpa = map_raw
+            else:
+                PSI_TO_KPA = 6.89476
+                baro_kpa = baro_raw * PSI_TO_KPA
+                map_kpa = map_raw * PSI_TO_KPA
+
+            pkt["baro_kpa"] = float(baro_kpa)
+            pkt["map_kpa"] = float(map_kpa)
+            pkt["lambda"] = float(lam_raw)
+
+        elif arb_id == ID_PE3 and len(b) >= 8:
+            # Oil pressure encoded in bytes 2–3 with custom linear conversion
+            raw_op = s16_lohi(b[2], b[3])
+            oil_psi = (raw_op / 1000.0) * 25.0 - 12.5
+            pkt["oil_psi"] = float(oil_psi)
+
+        elif arb_id == ID_PE5 and len(b) >= 8:
+            # Wheel speeds in Hz (0.2 Hz/bit)
+            ws_fr = s16_lohi(b[0], b[1]) * 0.2
+            ws_fl = s16_lohi(b[2], b[3]) * 0.2
+            ws_br = s16_lohi(b[4], b[5]) * 0.2
+            ws_bl = s16_lohi(b[6], b[7]) * 0.2
+
+            pkt["ws_fr_hz"] = float(ws_fr)
+            pkt["ws_fl_hz"] = float(ws_fl)
+            pkt["ws_br_hz"] = float(ws_br)
+            pkt["ws_bl_hz"] = float(ws_bl)
+
+        elif arb_id == ID_PE6 and len(b) >= 8:
+            # Battery, Air Temp, Coolant
+            batt_v = s16_lohi(b[0], b[1]) * 0.01    # volts
+            air_raw = s16_lohi(b[2], b[3]) * 0.1    # C or F
+            clt_raw = s16_lohi(b[4], b[5]) * 0.1    # C or F
+            temp_c = (b[6] & 0x01) != 0             # 0=F, 1=C per AN400
+
+            if temp_c:
+                air_c = air_raw
+                coolant_c = clt_raw
+            else:
+                air_c = (air_raw - 32.0) * (5.0 / 9.0)
+                coolant_c = (clt_raw - 32.0) * (5.0 / 9.0)
+
+            pkt["batt_v"] = float(batt_v)
+            pkt["air_c"] = float(air_c)
+            pkt["coolant_c"] = float(coolant_c)
+
+        elif arb_id == ID_PE9 and len(b) >= 8:
+            # Lambda primary
+            lam = s16_lohi(b[0], b[1]) * 0.01
+            pkt["lambda"] = float(lam)
+
+        # If we only got metadata (no decoded fields), drop it
+        if len(pkt) <= 4:  # only ts_ms, pkt, src, node_id
+            return None
+
+        return pkt
 
     def _write_csv_row(self, pkt: Dict[str, float]) -> None:
         import csv

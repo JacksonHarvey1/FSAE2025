@@ -1,23 +1,38 @@
 // CAN_to_Pi_USB.ino
 //
 // Feather RP2040 + MCP2515
-//   → Sniff PE3 CAN frames (AN400 protocol)
-//   → Stream raw frames over USB serial to Raspberry Pi.
+//   → Sniff AN400 CAN frames from the ECU
+//   → Maintain a decoded telemetry snapshot
+//   → Emit one NDJSON telemetry object over USB serial at ~20 Hz.
 //
 // This sketch combines the low‑level MCP2515 CAN receiver from Test1.ino
-// with the simple USB serial telemetry pattern from Communicationtest.ino.
+// with the decoded JSON telemetry schema consumed by pit_telemetry/backend.
 //
-// Serial line format to the Pi (one line per received CAN frame):
-//   CAN,<ts_ms>,<id_hex>,<ext>,<dlc>,<b0>,<b1>,<b2>,<b3>,<b4>,<b5>,<b6>,<b7>
+// NDJSON line format to the Pi (one JSON object per line, ~20 Hz):
+//   {
+//     "ts_ms": <millis>,
+//     "pkt": <counter>,
+//     "src": "can",
+//     "node_id": 1,
+//     "rpm": ...,
+//     "tps_pct": ...,
+//     "fot_ms": ...,
+//     "ign_deg": ...,
+//     "baro_kpa": ...,
+//     "map_kpa": ...,
+//     "lambda": ...,
+//     "batt_v": ...,
+//     "coolant_c": ...,
+//     "air_c": ...,
+//     "oil_psi": ...,
+//     "ws_fl_hz": ...,
+//     "ws_fr_hz": ...,
+//     "ws_bl_hz": ...,
+//     "ws_br_hz": ...
+//   }
 //
-//  - ts_ms:   millis() timestamp (unsigned long)
-//  - id_hex:  arbitration ID in hex (no 0x prefix), e.g. CFFF048
-//  - ext:     1 for extended frame, 0 for standard
-//  - dlc:     Data length code (0–8)
-//  - b0..b7:  data bytes as unsigned decimal 0–255 (unused bytes = 0)
-//
-// Any other Serial output (e.g. human‑readable debug) does NOT start with
-// "CAN," so the Pi reader can ignore those lines.
+// Lines starting with "#" are debug / status and are ignored by the Pi
+// ingestor.
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -448,8 +463,8 @@ void loop() {
     updateTelemetryFromFrame(f);
   }
 
-  // ---- Periodic JSON telemetry snapshot (e.g. 10 Hz) ----
-  if (now - lastJson >= 100) { // 100 ms
+  // ---- Periodic JSON telemetry snapshot (~20 Hz) ----
+  if (now - lastJson >= 50) { // 50 ms
     lastJson = now;
     sendTelemetryJson();
   }
