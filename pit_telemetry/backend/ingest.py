@@ -175,14 +175,14 @@ class SerialIngestor:
     def _run_loop(self) -> None:
         self._open_serial()
         print(f"[ingest] Listening on {self.port} @ {self.baud}")
-
+        partial = ""
         while not self._stop.is_set():
             if not self._serial or not self._serial.is_open:
                 self._open_serial()
                 continue
 
             try:
-                raw = self._serial.readline()
+                raw = self._serial.read_until(b"\n")  # blocks until newline
             except Exception as e:
                 print(f"[ingest] Serial error: {e}; reopening port")
                 try:
@@ -206,14 +206,20 @@ class SerialIngestor:
 
             if line.startswith("#") or line.startswith("DBG"):
                 # Status/debug from firmware
-                print(line)
+               # print(line)
                 continue
-
+            if partial:
+                line = partial + line
+                partial = ""
             # Legacy/raw CAN format from older RP2040 sketches:
             #   CAN,<ts_ms>,<id_hex>,<ext>,<dlc>,<b0>,...,<b7>
             # We decode these into the same JSON-style dict the rest of
             # the app expects so that existing firmware can be used
             # without changes.
+            if line.startswith("{") and not line.endswith("}"):
+                partial = line
+                continue
+            
             if line.startswith("CAN,"):
                 pkt = self._parse_can_csv_line(line)
                 if pkt:
@@ -223,14 +229,15 @@ class SerialIngestor:
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
-                # Bad line; you may want to log this separately
-                print(f"[ingest] Bad JSON: {line[:120]}")
+                # buffer if it's clearly the start of JSON
+                if line.startswith("{"):
+                    partial = line
+                else:
+                    print(f"[ingest] Bad JSON: {line[:120]}")
                 continue
 
-            if not isinstance(obj, dict):
-                continue
-
-            self._handle_packet(obj)
+            if isinstance(obj, dict):
+                self._handle_packet(obj)
 
     def _handle_packet(self, pkt: Dict[str, float]) -> None:
         now = time.time()
