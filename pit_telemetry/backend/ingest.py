@@ -153,11 +153,24 @@ class SerialIngestor:
     def _open_serial(self) -> None:
         while not self._stop.is_set():
             try:
-                self._serial = serial.Serial(self.port, self.baud, timeout=1)
+                self._serial = serial.Serial(
+                    self.port,
+                    self.baud,
+                    timeout=None,          # BLOCK until newline arrives
+                    exclusive=True         # Linux: prevent other opens
+                )
+                # reduce weirdness on connect
+                self._serial.reset_input_buffer()
+                try:
+                    self._serial.dtr = False
+                    self._serial.rts = False
+                except Exception:
+                    pass
                 return
             except Exception as e:
                 print(f"[ingest] Serial open failed on {self.port}: {e}; retrying...")
                 time.sleep(1.5)
+
 
     def _run_loop(self) -> None:
         self._open_serial()
