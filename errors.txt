@@ -1,8 +1,32 @@
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
-[ingest] Serial open failed on /dev/ttyACM0: [Errno 11] Could not exclusively lock port /dev/ttyACM0: [Errno 11] Resource temporarily unavailable; retrying...
+pkt=7393] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7394] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7395] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7396] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7397] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7398] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7399] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7400] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7401] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7402] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[bad json] {"ts_ms":474578,"pkt":7403,"src":"can","node_id":1,"last_id":218100040,"last_ext":1,"last_dlc":8,"seen_an400":1,"r{"ts_m
+[pkt=7408] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7409] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7410] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7411] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7412] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7413] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7414] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7415] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7416] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7417] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7418] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7419] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7420] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7421] rpm=0 tps_pct=0.0 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[bad json] {"ts_ms":476479,"pkt":7422,"src":"can","node_id":1,"last_id":218100040,"last_ext":1,"last_dlc":8,"seen_an400":1,"rpm":0,
+[pkt=7433] rpm=0 tps_pct=34.7 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7434] rpm=0 tps_pct=38.3 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7435] rpm=0 tps_pct=41.8 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7436] rpm=0 tps_pct=44.8 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7437] rpm=0 tps_pct=47.4 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
+[pkt=7438] rpm=0 tps_pct=49.9 map_kpa=75.98 batt_v=0.0 coolant_c=0.0
