@@ -1,0 +1,52 @@
+[ingest] Bad JSON: {"t_ms":1092,"k"141,"src":cn,nd_d:,rm:,tspt:.,ftm"58"g_e"50"aoka:0.5"a_p"7.4"aba:280"atv:.0"oln_"00"i_"00"i_s"00"sf_z:.,
+[ingest] Bad JSON: {ts_m"60972"pkt:142,sc:cn,nd_d:,rm:"p_c"00"o_s:38"g_e"50"aoka:0.5"a_p"7.4"aba:20bt_"00,coatc:.,arc:.,olpi:.,w_lh"00"sf_z
+#SAfae/=0
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: {tsm"612,pt:43"r""a""o_d:,rm:,tspt:.,ftm:38"g_e"50"aoka:0.5"a_p"7.4"aba:280"atv:.0"oln_"00"ic:.,l_pi:0.,w_lh"00"sf_z:.,w
+# STAT frames/s=40
+[ingest] Bad JSON: m2"t"sc:cn,nd_d:"p"0"p_c"26"ftm"5.,indg:.,br_p"113,mpka:58,laba:28,bt_"00,coatc:.,arc:.,olpi:.,w_lh"00"sf_z:.,w_lh"00"sb
+[ingest] Bad JSON: {"ts_s":61207,pk":1474,r""a""oei"1,rm:,tspt:.,o_s:38"g_e"50"aoka:0.5"a_p"7.4"md"1.00"atv:.0"oln_"00"i_"00"i_s"00"sf_z:.,
+[ingest] Bad JSON: tr""a""oe_d:,rm:,tspt:.,ftm"5.,indg:.,br_p"113,mpka:58,lmd"1.0,bt_"00,coatc:.,arc:.,olpi:.,w_lh"00"sfrh"00"sb_z:.,w_rh"0
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: 2k"4""cn,nd_d:,rm:,spt:09"t8"g_e"5,r_p"113,mpka:58,lmd"1.0,bt_"00,coatc:.,arc:.,olpi:.,w_lh"00"sf_z:.,w_lh"00"sb_z:.}
+# STAT frames/s=40
+[ingest] Bad JSON: t_:122"k"19,sc:cn,nd_d:,rm:,tspt:84"o_s:39"g_e"50"aoka:0.5"a_a:58,lma:28"bt_"00,coatc:.,,sf_z:.,w_rh"00"sb_h"00"sb_z:.}
+[ingest] Bad JSON: "_s:32,pt:4s:cn,nd_d:p"0"p_c"3.,ftm"5.indg:.,br_p"13,mp"74lmd"1.0,bt_0,"oan_"00"i_"00"i_s"00"_lh"00"sf_z:.,w_lh"00"sb_z:
+[ingest] Bad JSON: {"ts_ms":613222,"pkt":1497,"src":"can","node_id":1,"rpm":0,"tps_pct":37.6,"fot_ms":53.9,"ign_deg":5.0,"baro_kpa":101.35,
+[ingest] Bad JSON: "t_s:132"k"10,sc:cn,nd_d:,rm:,tspt:97"o_s:39"g_e"50"aoka:0.5"a_p"7.4"aba:280"atv:.0"oln_"00arc:.,olpi:.f_:.,w_rh:.,w_lh"
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: t_s:142"k"10,sc:cn,nd_d:,rm:,tspt:09"om"5.,indg:.,boka:0.5"aka:58,aba:280"a_"00,coatc:.,i_"00"i_s"00"sf_z:0"sf_z:.,w_lh"
+# STAT frames/s=40
+[ingest] Bad JSON: {"ts_ms":614472,"pkt":1522,"src":"can","node_id":1,"rpm":0,"tps_pct":52.1,"fot_ms":53.8,"ign_deg":5.0,"baro_kpa":101.35,
+[ingest] Bad JSON: {m152t:53sc:cn,nd_d:,p"0"p_c"5.,o_s:38"g_e"50"broka:0.5"a_p"7.4"aba:280"atv:.0"oln_"00"i_".,olpi:.,w_lh"00"sf_z:.,w_lh"0
+[ingest] Bad JSON: {"ts_ms":61472,"pt"124,sr""a,nd_d:,rm:,ts_c"5.,ftm"5.,indg:.,aoka:0.,mpka5.4"aba:280"atv:0,coatc:.,arc:.,olpi:.,w_lh"00"
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: ss:2k12,sc:cn,nd_id":,"",tspt:09"o_s:38"g_e"50r_p"113,mpka:58,lmd"1.0,ba_v:0,"oln_"00"i_"00"i_s"00"sf_z:.,w_rh"00"_"00"s
+# STAT frames/s=40
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+# STAT frames/s=40
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: {"ts_"617,pt:57"r""a""oei"1"p"0"p_c"00"o_s:39"g_e"50"aoka:0.5"a_p"7.4"aba:280"atv:.0,coatc"00"i_"00"i_s"00"sf_z:.,w_rh"0
+# STAT frames/s=40
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: tm"677,pt:58"r""a""oei"1"p"0"p_c"3.,ftm"5.,indg:.,br_p"113,mpka:58,lmd":280"atv:.0"oln_"00"i_"00"olpi:.,w_lh"00"sf_z:.,w
+# STAT frames/s=40
+[ingest] Bad JSON: {"ts_ms":618772,"pkt":1608,"src":"can","node_id":1,"rpm":0,"tps_pct":5.3,"fot_ms":53.9,"ign_deg":5.0,"baro_kpa":101.35,"
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: "t_s:687,pt:60"r""a""o_d:,rm:,tspt:.,ftm"5.,indg:.,br_p"113,mpka:58,lmda:280"atv:.0"oln_"00"i_"00"i_p:.,w_lh"00"sf_z:.,w
+# STAT frames/s=40
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: "sm"692,pt:61"r""a""oei"1"p"0"p_c"00"o_s:38"g_e"50"aoka:3"a.4ad"1.0,bt_"00,coatc:.,arc:.,olpi:.,w_lh"00"sf_z:.,w_l.}
+# STAT frames/s=40
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: {ts_s":2092,"kt"15,sc":cn,nd_d:,rm:,tspt:59"o_s:39"g_e"50"broka:013,mpka"md"1.0,bt_v:.0"olntc:.,arc:.,olpi:.,w_lh"00"sf_
+# STAT frames/s=40
+[ingest] Bad JSON: SA rmss=0
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: {"t_ms"62202,"kt":167,sc:"can,nd_d:,rm:,tspt:5.,ftm"5.,indg:.,br_p"113,mpka:58,lmd"1.0,bt_"00,coatc:.,arc:.,olpi:.,w_lh"
+# STAT frames/s=40
+[ingest] Bad JSON: {ts_ms":2307,pkt:694"sr":"an",node_id"1,"rm:,"pspt:11"ftms:5.,indg:.,br_p"10.5"a_p"75.84,"laba:280bt_"00,coatc:0.0,"air_
+[ingest] Bad JSON: {"ts_ms":623122,"pt:65"r""a""oei"1"p":,"p_c"3.,ftm"5.,indg:50"aokpa":101.35,"ma_ka":75.84,"lambda":12.800,"at_"00,clnt_c
+[ingest] Bad JSON: "62""1,cc":p"0t_c"3.,o_"39"g_e"50"aoka:13,mpka:md"1.0,"atv:.0k"19,sc:cn,nd_d:,rm0z00"sb_z:.,w_rh"00
+[ingest] Serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?); reopening port
+[ingest] Bad JSON: 22,t:19,sc:cn,nd_d:,rm:,tspt:12"o_s:39"g_e"5.0,"baro_kpa":101.35,"map_kpa":75.84,"lambda":12.800,batv:.00,coln_"00"i_":0
