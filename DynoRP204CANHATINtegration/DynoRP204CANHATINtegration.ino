@@ -20,7 +20,7 @@
 #endif
 
 // ---------- Settings ----------
-static constexpr uint32_t SERIAL_BAUD   = 115200;
+static constexpr uint32_t SERIAL_BAUD   = 921600;
 static constexpr uint32_t CAN_BITRATE   = 250000;
 static constexpr uint32_t JSON_PERIOD_MS = 50;   // 20 Hz
 static constexpr uint32_t STAT_PERIOD_MS = 1000; // 1 Hz
@@ -152,53 +152,69 @@ void updateTelemetryFromFrame(uint32_t id, bool ext, uint8_t dlc, const uint8_t 
 
 // Emit one line of NDJSON telemetry representing the latest snapshot.
 void sendTelemetryJson() {
-  if (!g_seen_any_can) return;   // <-- change from g_seen_any_frame
+  if (!g_seen_any_can) return;
 
   g_pkt_counter++;
   uint32_t ts = millis();
 
-  Serial.print('{');
-  bool first = true;
-  auto add_kv = [&](const char *key) {
-    if (!first) Serial.print(',');
-    first = false;
-    Serial.print('"'); Serial.print(key); Serial.print('"');
-    Serial.print(':');
-  };
+  String s;
+  s.reserve(320);
 
-  add_kv("ts_ms");   Serial.print(ts);
-  add_kv("pkt");     Serial.print(g_pkt_counter);
-  add_kv("src");     Serial.print("\"can\"");
-  add_kv("node_id"); Serial.print(1);
+  s += "{\"ts_ms\":";
+  s += ts;
 
-  // ---- Debug fields so we can verify the library is reporting EXT/DLC correctly
-  add_kv("last_id");  Serial.print(g_last_id);
-  add_kv("last_ext"); Serial.print(g_last_ext ? 1 : 0);
-  add_kv("last_dlc"); Serial.print(g_last_dlc);
-  add_kv("seen_an400"); Serial.print(g_seen_any_frame ? 1 : 0);
+  s += ",\"pkt\":";
+  s += g_pkt_counter;
 
-  // ---- Your decoded fields (will stay at defaults until AN400 frames decode)
-  add_kv("rpm");      Serial.print(g_rpm);
-  add_kv("tps_pct");  Serial.print(g_tps_pct, 1);
-  add_kv("fot_ms");   Serial.print(g_fot_ms, 1);
-  add_kv("ign_deg");  Serial.print(g_ign_deg, 1);
+  s += ",\"src\":\"can\"";
+  s += ",\"node_id\":1";
 
-  add_kv("baro_kpa"); Serial.print(g_baro_kpa, 2);
-  add_kv("map_kpa");  Serial.print(g_map_kpa, 2);
-  add_kv("lambda");   Serial.print(g_lambda, 3);
+  s += ",\"rpm\":";
+  s += g_rpm;
 
-  add_kv("batt_v");     Serial.print(g_batt_v, 2);
-  add_kv("coolant_c");  Serial.print(g_coolant_c, 1);
-  add_kv("air_c");      Serial.print(g_air_c, 1);
-  add_kv("oil_psi");    Serial.print(g_oil_psi, 1);
+  s += ",\"tps_pct\":";
+  s += String(g_tps_pct, 1);
 
-  add_kv("ws_fl_hz"); Serial.print(g_ws_fl_hz, 1);
-  add_kv("ws_fr_hz"); Serial.print(g_ws_fr_hz, 1);
-  add_kv("ws_bl_hz"); Serial.print(g_ws_bl_hz, 1);
-  add_kv("ws_br_hz"); Serial.print(g_ws_br_hz, 1);
+  s += ",\"fot_ms\":";
+  s += String(g_fot_ms, 1);
 
-  Serial.println('}');
+  s += ",\"ign_deg\":";
+  s += String(g_ign_deg, 1);
+
+  s += ",\"baro_kpa\":";
+  s += String(g_baro_kpa, 2);
+
+  s += ",\"map_kpa\":";
+  s += String(g_map_kpa, 2);
+
+  s += ",\"lambda\":";
+  s += String(g_lambda, 3);
+
+  s += ",\"batt_v\":";
+  s += String(g_batt_v, 2);
+
+  s += ",\"coolant_c\":";
+  s += String(g_coolant_c, 1);
+
+  s += ",\"air_c\":";
+  s += String(g_air_c, 1);
+
+  s += ",\"oil_psi\":";
+  s += String(g_oil_psi, 1);
+
+  s += ",\"ws_fl_hz\":";
+  s += String(g_ws_fl_hz, 1);
+  s += ",\"ws_fr_hz\":";
+  s += String(g_ws_fr_hz, 1);
+  s += ",\"ws_bl_hz\":";
+  s += String(g_ws_bl_hz, 1);
+  s += ",\"ws_br_hz\":";
+  s += String(g_ws_br_hz, 1);
+
+  s += "}";
+  Serial.println(s);
 }
+
 
 void setup() {
   pinMode(LED_RED, OUTPUT);
@@ -286,12 +302,12 @@ void loop() {
 
 
   // Periodic status (optional, 1 Hz)
-  if (now - lastStat >= STAT_PERIOD_MS) {
-    lastStat = now;
-    Serial.print("# STAT frames/s=");
-    Serial.println(frameCountThisSec);
-    frameCountThisSec = 0;
-  }
+  //if (now - lastStat >= STAT_PERIOD_MS) {
+    //lastStat = now;
+    //Serial.print("# STAT frames/s=");
+    //Serial.println(frameCountThisSec);
+   // frameCountThisSec = 0;
+ // }
 
   // Periodic NDJSON telemetry snapshot (~20 Hz)
   if (now - lastJson >= JSON_PERIOD_MS) {

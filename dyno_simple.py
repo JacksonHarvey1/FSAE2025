@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 # ---------- CONFIG ----------
 PORT = "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00"
-BAUD = 115200
+BAUD = 921600
 
 WINDOW_S = 20.0
 

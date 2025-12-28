@@ -195,7 +195,7 @@ def main() -> None:
             last_pkt_id = pkt_id
     # append values to deque here
 
-
+    
         # Only append if we have something fresh-ish
         if pkt and (now - reader.latest_rx_time) < 2.0:
             # Use firmware ts_ms if present, else local time
