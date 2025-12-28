@@ -23,16 +23,16 @@ from typing import Any, Dict
 from flask import Flask, Response, jsonify, render_template, request
 
 try:
-    # Package-relative imports when run as part of pit_telemetry
+    # Package-relative imports when run as part of pit_telemetry (installed
+    # or run via ``python -m pit_telemetry.backend.app``)
     from .config import settings
     from .ingest import SerialIngestor
-except ImportError:  # pragma: no cover - fallback for "python app.py"
-    import os
-    import sys
-
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from pit_telemetry.backend.config import settings
-    from pit_telemetry.backend.ingest import SerialIngestor
+except ImportError:  # pragma: no cover - fallback for ``python app.py``
+    # When run as a standalone script from inside pit_telemetry/backend,
+    # treat this directory as the import root so we can simply
+    # ``import config`` and ``import ingest``.
+    from config import settings  # type: ignore
+    from ingest import SerialIngestor  # type: ignore
 
 
 ingestor = SerialIngestor()
