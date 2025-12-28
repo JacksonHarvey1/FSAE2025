@@ -3,3 +3,9 @@ lsof: WARNING: can't stat() fuse.gvfsd-fuse file system /run/user/1000/gvfs
       Output information may be incomplete.
 lsof: WARNING: can't stat() fuse.portal file system /run/user/1000/doc
       Output information may be incomplete.
+
+
+jackson@Jackson1:~ $ sudo fuser -v /dev/ttyACM0
+jackson@Jackson1:~ $ ls -l /dev/serial/by-id/
+total 0
+lrwxrwxrwx 1 root root 13 Dec 27 19:55 usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00 -> ../../ttyACM0
