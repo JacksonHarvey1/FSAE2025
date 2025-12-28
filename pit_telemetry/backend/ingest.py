@@ -152,24 +152,36 @@ class SerialIngestor:
 
     def _open_serial(self) -> None:
         while not self._stop.is_set():
+        # Try exclusive first
             try:
                 self._serial = serial.Serial(
                     self.port,
                     self.baud,
-                    timeout=None,          # BLOCK until newline arrives
-                    exclusive=True         # Linux: prevent other opens
+                    timeout=None,
+                    exclusive=True,
                 )
-                # reduce weirdness on connect
                 self._serial.reset_input_buffer()
-                try:
-                    self._serial.dtr = False
-                    self._serial.rts = False
-                except Exception:
-                    pass
                 return
             except Exception as e:
-                print(f"[ingest] Serial open failed on {self.port}: {e}; retrying...")
+                msg = str(e)
+                print(f"[ingest] Serial open failed on {self.port} (exclusive): {e}; retrying...")
+
+                # If exclusive lock fails, fall back to non-exclusive (still better than dead)
+                if "exclusively lock port" in msg or "Resource temporarily unavailable" in msg:
+                    try:
+                        self._serial = serial.Serial(
+                            self.port,
+                            self.baud,
+                            timeout=None,
+                        )
+                        self._serial.reset_input_buffer()
+                        print("[ingest] Opened serial WITHOUT exclusive lock (fallback).")
+                        return
+                    except Exception as e2:
+                        print(f"[ingest] Fallback open failed: {e2}; retrying...")
+
                 time.sleep(1.5)
+
 
 
     def _run_loop(self) -> None:

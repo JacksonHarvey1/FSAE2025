@@ -12,8 +12,9 @@ from dataclasses import dataclass
 @dataclass
 class Settings:
     # Serial
-    serial_port: str = os.environ.get("FSAE_SERIAL_PORT", "/dev/ttyACM0")
-    serial_baud: int = int(os.environ.get("FSAE_SERIAL_BAUD", "115200"))
+    serial_port = "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00"
+    serial_baud = serial_baud = 115200
+
 
     # Ingestion
     json_hz: float = float(os.environ.get("FSAE_JSON_HZ", "10"))
