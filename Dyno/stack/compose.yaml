@@ -1,0 +1,52 @@
+services:
+  influxdb2:
+    image: influxdb:2
+    container_name: influxdb2
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_ORG: yorkracing
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+      DOCKER_INFLUXDB_INIT_USERNAME_FILE: /run/secrets/influxdb2-admin-username
+      DOCKER_INFLUXDB_INIT_PASSWORD_FILE: /run/secrets/influxdb2-admin-password
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN_FILE: /run/secrets/influxdb2-admin-token
+    secrets:
+      - influxdb2-admin-username
+      - influxdb2-admin-password
+      - influxdb2-admin-token
+    volumes:
+      - influxdb2-data:/var/lib/influxdb2
+      - influxdb2-config:/etc/influxdb2
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # Note: these env vars only affect the *initial* admin user on first boot.
+      # Grafana persists its DB in grafana-data.
+      GF_SECURITY_ADMIN_PASSWORD: "ChangeMe_Once"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - influxdb2
+    restart: unless-stopped
+
+secrets:
+  influxdb2-admin-username:
+    file: ./secrets/influxdb2-admin-username
+  influxdb2-admin-password:
+    file: ./secrets/influxdb2-admin-password
+  influxdb2-admin-token:
+    file: ./secrets/influxdb2-admin-token
+
+volumes:
+  influxdb2-data:
+  influxdb2-config:
+  grafana-data:
+

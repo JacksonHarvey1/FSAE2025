@@ -1,0 +1,8 @@
+# Real secret files must never be committed
+secrets/influxdb2-admin-username
+secrets/influxdb2-admin-password
+secrets/influxdb2-admin-token
+
+# Keep example templates tracked
+!secrets/*.example
+
