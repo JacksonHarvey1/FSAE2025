@@ -547,7 +547,7 @@ def main() -> None:
     else:
         threading.Thread(target=serial_worker, daemon=True).start()
 
-    app.run_server(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)
+    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)
 
 
 if __name__ == "__main__":
