@@ -63,6 +63,7 @@ APP_PORT = int(os.getenv("DYNO_APP_PORT", "8050"))
 APP_DEBUG = os.getenv("DYNO_APP_DEBUG", "0") == "1"
 THEME_NAME = os.getenv("DYNO_APP_THEME", "CYBORG")
 THEME = getattr(dbc.themes, THEME_NAME, dbc.themes.CYBORG)
+APP_REFRESH_MS = int(os.getenv("DYNO_APP_REFRESH_MS", "200"))
 
 RATE_WINDOW = 5.0  # seconds for rolling rate estimate
 STALE_THRESHOLD = 2.5  # show warning if no pkt within this window
@@ -345,7 +346,7 @@ app.layout = dbc.Container(
         ),
         dbc.Row(
             dbc.Col(
-                dcc.Graph(id="live-graph", style={"height": "500px"}),
+                html.Div(id="graph-grid"),
                 width=12,
             ),
             className="mb-4",
@@ -371,14 +372,14 @@ app.layout = dbc.Container(
                 width=12,
             ),
         ),
-        dcc.Interval(id="update-interval", interval=500, n_intervals=0),
+        dcc.Interval(id="update-interval", interval=APP_REFRESH_MS, n_intervals=0),
     ],
     fluid=True,
 )
 
 
 @app.callback(
-    Output("live-graph", "figure"),
+    Output("graph-grid", "children"),
     Output("stat-cards", "children"),
     Output("raw-table", "data"),
     Output("raw-table", "columns"),
@@ -394,14 +395,14 @@ def refresh_dashboard(_, selected_metrics, graph_style, raw_toggle):  # noqa: D4
     status = get_status()
 
     metrics = selected_metrics or KEYS
-    figure = _build_figure(snapshot, metrics, graph_style)
+    graphs = _build_graph_grid(snapshot, metrics, graph_style)
     stats = _build_stat_cards(snapshot, metrics)
     table_data, table_columns = _build_table(snapshot)
     show_raw = raw_toggle and "raw" in raw_toggle
     table_style = {"display": "block"} if show_raw else {"display": "none"}
     banner = _build_status_banner(snapshot, status)
 
-    return figure, stats, table_data, table_columns, table_style, banner
+    return graphs, stats, table_data, table_columns, table_style, banner
 
 
 @app.callback(Output("metric-select", "value"), Input("reset-buffer", "n_clicks"))
@@ -412,40 +413,68 @@ def reset_buffer(n_clicks: int):
     raise dash.exceptions.PreventUpdate
 
 
-def _build_figure(snapshot: TelemetrySnapshot, metrics: List[str], graph_style: str) -> go.Figure:
-    fig = go.Figure()
+def _build_graph_grid(snapshot: TelemetrySnapshot, metrics: List[str], graph_style: str) -> List[dbc.Row]:
     ts = snapshot.timestamps
     if not ts or not metrics:
-        fig.add_annotation(
-            text="Waiting for data…",
-            showarrow=False,
-            font={"size": 18},
-        )
-    else:
-        x0 = ts[0]
-        x = [t - x0 for t in ts]
-        mode = "lines+markers" if graph_style == "lines+markers" else "lines"
-        for key in metrics:
-            series = snapshot.series.get(key)
-            if not series:
-                continue
-            fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=series,
-                    name=key.upper(),
-                    mode=mode,
-                    connectgaps=True,
-                )
+        return [dbc.Row(dbc.Col(dbc.Alert("Waiting for data…", color="secondary")))]
+
+    x0 = ts[0]
+    x = [t - x0 for t in ts]
+    mode = "lines+markers" if graph_style == "lines+markers" else "lines"
+
+    cols: List[dbc.Col] = []
+    for key in metrics:
+        series = snapshot.series.get(key)
+        fig = _build_metric_figure(x, series, key, mode)
+        cols.append(
+            dbc.Col(
+                dbc.Card(
+                    [
+                        dbc.CardHeader(key.upper()),
+                        dbc.CardBody(
+                            dcc.Graph(
+                                figure=fig,
+                                config={"displayModeBar": False},
+                                style={"height": "280px"},
+                            )
+                        ),
+                    ],
+                    className="bg-dark text-light",
+                ),
+                xs=12,
+                md=6,
             )
-        fig.update_xaxes(title_text="Time (s)")
-        fig.update_yaxes(title_text="Value")
+        )
+
+    rows: List[dbc.Row] = []
+    for i in range(0, len(cols), 2):
+        rows.append(dbc.Row(cols[i : i + 2], className="g-3 mb-2"))
+    return rows
+
+
+def _build_metric_figure(
+    x: List[float], series: Optional[List[Optional[float]]], key: str, mode: str
+) -> go.Figure:
+    fig = go.Figure()
+    if not series:
+        fig.add_annotation(text="No data", showarrow=False, font={"size": 16})
+    else:
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=series,
+                mode=mode,
+                connectgaps=True,
+            )
+        )
+    fig.update_xaxes(title_text="Time (s)")
+    fig.update_yaxes(title_text=key.upper())
     fig.update_layout(
         template="plotly_dark",
-        margin={"l": 40, "r": 20, "t": 30, "b": 40},
-        legend={"orientation": "h", "y": -0.2},
+        margin={"l": 40, "r": 10, "t": 10, "b": 40},
+        showlegend=False,
         hovermode="x unified",
-        transition_duration=200,
+        transition_duration=150,
     )
     return fig
 

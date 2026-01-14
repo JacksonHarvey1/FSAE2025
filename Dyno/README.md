@@ -282,3 +282,10 @@ All stack assets live in `Dyno/stack/`.
 - Back up the `influxdb2-data` and `grafana-data` volumes periodically if you rely on historical traces.
 
 With these steps complete, the Raspberry Pi should boot into a fully functional dyno telemetry stack that automatically ingests RP2040 data and serves it to Grafana in real time.
+
+
+python3 -m venv ~/dash_venv
+source ~/dash_venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install dash dash-bootstrap-components plotly
+python -c "import dash, dash_bootstrap_components as dbc; import plotly.graph_objects as go; print('ok')"
