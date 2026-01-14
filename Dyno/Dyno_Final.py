@@ -344,6 +344,10 @@ app.layout = dbc.Container(
             ],
             className="mb-4",
         ),
+        html.Div(
+            dcc.Graph(id="live-graph", style={"display": "none"}),
+            style={"display": "none"},
+        ),
         dbc.Row(
             dbc.Col(
                 html.Div(id="graph-grid"),
@@ -379,6 +383,7 @@ app.layout = dbc.Container(
 
 
 @app.callback(
+    Output("live-graph", "figure"),
     Output("graph-grid", "children"),
     Output("stat-cards", "children"),
     Output("raw-table", "data"),
@@ -395,6 +400,7 @@ def refresh_dashboard(_, selected_metrics, graph_style, raw_toggle):  # noqa: D4
     status = get_status()
 
     metrics = selected_metrics or KEYS
+    legacy_fig = _build_legacy_overlay(snapshot, metrics, graph_style)
     graphs = _build_graph_grid(snapshot, metrics, graph_style)
     stats = _build_stat_cards(snapshot, metrics)
     table_data, table_columns = _build_table(snapshot)
@@ -402,7 +408,7 @@ def refresh_dashboard(_, selected_metrics, graph_style, raw_toggle):  # noqa: D4
     table_style = {"display": "block"} if show_raw else {"display": "none"}
     banner = _build_status_banner(snapshot, status)
 
-    return graphs, stats, table_data, table_columns, table_style, banner
+    return legacy_fig, graphs, stats, table_data, table_columns, table_style, banner
 
 
 @app.callback(Output("metric-select", "value"), Input("reset-buffer", "n_clicks"))
@@ -411,6 +417,42 @@ def reset_buffer(n_clicks: int):
         BUFFER.clear()
         return KEYS
     raise dash.exceptions.PreventUpdate
+
+
+def _build_legacy_overlay(
+    snapshot: TelemetrySnapshot, metrics: List[str], graph_style: str
+) -> go.Figure:
+    fig = go.Figure()
+    ts = snapshot.timestamps
+    if not ts or not metrics:
+        fig.add_annotation(text="Waiting for data…", showarrow=False, font={"size": 18})
+    else:
+        x0 = ts[0]
+        x = [t - x0 for t in ts]
+        mode = "lines+markers" if graph_style == "lines+markers" else "lines"
+        for key in metrics:
+            series = snapshot.series.get(key)
+            if not series:
+                continue
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=series,
+                    name=key.upper(),
+                    mode=mode,
+                    connectgaps=True,
+                )
+            )
+        fig.update_xaxes(title_text="Time (s)")
+        fig.update_yaxes(title_text="Value")
+    fig.update_layout(
+        template="plotly_dark",
+        margin={"l": 40, "r": 20, "t": 30, "b": 40},
+        legend={"orientation": "h", "y": -0.2},
+        hovermode="x unified",
+        transition_duration=200,
+    )
+    return fig
 
 
 def _build_graph_grid(snapshot: TelemetrySnapshot, metrics: List[str], graph_style: str) -> List[dbc.Row]:
