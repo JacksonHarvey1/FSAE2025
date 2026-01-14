@@ -21,10 +21,47 @@ Key files:
 | --- | --- |
 | `Dyno/dyno_ingest_influx.py` | Serial NDJSON → InfluxDB writer (runs on Pi) |
 | `Dyno/dyno_simple.py` | Local plotting helper if you just want to view packets |
+| `Dyno/Dyno_Final.py` | Dash-powered local dashboard with live graphs + raw table |
 | `Dyno/stack/compose.yaml` | Docker stack for InfluxDB 2 + Grafana |
 | `Dyno/stack/README.md` | Detailed stack instructions |
 | `Dyno/README_ingest.md` | Minimal ingest quick start |
 | `Dyno/dyno-ingest.service` | systemd service template |
+
+---
+
+## Optional: Local Dash UI (Dyno Final)
+
+If you just want a sleek local dashboard without standing up Influx + Grafana, run
+`Dyno/Dyno_Final.py`. It talks directly to the RP2040 serial stream and serves a
+Dash/Plotly app (default http://127.0.0.1:8050) featuring multi-series graphs,
+raw-value tables, a dark theme, and live status indicators.
+
+1. **Install deps (laptop or Pi):**
+   ```bash
+   python -m pip install dash dash-bootstrap-components plotly pyserial
+   ```
+2. **(Optional) set env vars** to override defaults:
+
+   | Variable | Purpose | Default |
+   | --- | --- | --- |
+   | `TELEM_PORT` | Serial path to RP2040 | `/dev/serial/by-id/...` |
+   | `TELEM_BAUD` | Baud rate | `921600` |
+   | `TELEM_KEYS` | Comma list of fields to plot/table | `rpm,tps_pct,map_kpa,batt_v,coolant_c` |
+   | `TELEM_WINDOW_S` | Rolling window length | `30` |
+   | `TELEM_FAKE_DATA` | Set `1` to use synthetic data (no hardware needed) | `0` |
+   | `DYNO_APP_HOST` / `DYNO_APP_PORT` | Dash server bind host/port | `127.0.0.1` / `8050` |
+   | `DYNO_APP_THEME` | Any `dash_bootstrap_components.themes.*` name | `CYBORG` |
+
+3. **Run it:**
+   ```bash
+   python Dyno/Dyno_Final.py
+   ```
+4. Open a browser to `http://<host>:<port>` and customize the UI on the fly
+   (choose metrics, toggle raw table, change graph style, or reset buffers).
+
+The fake-data mode is handy when you want to iterate on UI layout without being
+attached to the dyno hardware. Set `TELEM_FAKE_DATA=1` and you'll get a realistic
+sine/saw mix of telemetry fields at ~50 Hz.
 
 ---
 
