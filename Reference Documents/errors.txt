@@ -1,53 +1,499 @@
-[pkt=33670] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33671] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33672] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33673] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33674] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33675] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33676] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[bad json] {"ts_ms":1802836,"pkt":33677,"src":"can","node_id":1,"last_id":218100040,"last_ext":1,"last_dlc":8,"seen_an400":1,"rpm":
-[pkt=33693] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33694] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33695] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33696] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33697] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33698] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33699] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33700] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33701] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33702] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33703] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33704] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33705] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33706] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33707] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33708] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33709] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33710] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33711] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33712] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33713] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33714] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33715] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33716] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33717] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33718] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33719] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33720] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33721] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33722] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33723] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[bad json] {"ts_ms":1806137,"pkt":33724,"src":"can","node_id":1,"last_id":218100040,"{"ts_ms":1807288,"pkt":33728,"src":"can","node
-[pkt=33729] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33730] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33731] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33732] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33733] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33734] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33735] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33736] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33737] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33738] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33739] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33740] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
-[pkt=33741] rpm=0 tps_pct=0.0 map_kpa=75.84 batt_v=0.0 coolant_c=0.0
+ash is running on http://127.0.0.1:8050/
+
+ * Serving Flask app 'Dyno_Final'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8050
+Press CTRL+C to quit
+[2026-01-14 13:47:35,610] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:35] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:36,106] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:36] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:36,605] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:36] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:37,105] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:37] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:37,605] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:37] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:38,105] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:38] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:38,604] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:38] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:39,104] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:39] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:39,604] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:39] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:40,104] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:40] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:40,604] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:40] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:41,104] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:41] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:41,604] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:41] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:42,104] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:42] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:42,615] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:42] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:43,125] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:43] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:43,615] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1580, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1511, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'."
+127.0.0.1 - - [14/Jan/2026 13:47:43] "POST /_dash-update-component HTTP/1.1" 500 -
+[2026-01-14 13:47:44,120] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/dash/dash.py", line 1477, in _prepare_callback
+    cb = self.callback_map[output]
+         ~~~~~~~~~~~~~~~~~^^^^^^^^
+KeyError: '..live-graph.figure...stat-cards.children...raw-table.data...raw-table.columns...raw-table-container.style...status-banner.children..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/home/jackson/dash_venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
