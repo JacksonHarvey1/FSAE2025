@@ -29,8 +29,7 @@
 // • INT is optional. We default to polling CANINTF so an unwired INT pin is ok.
 
 //#ifndef SPI1_MISO
-  // Sanity guard: this sketch expects a board definition that exposes spi1.
-  //#error "This sketch requires RP2040 hardware with spi1 (Feather RP2040)."
+//  #error "This sketch requires RP2040 hardware with spi1 (Feather RP2040)."
 //#endif
 
 static constexpr uint8_t PIN_CAN_MISO   = 8;   // GP8  - SPI1 MISO
@@ -46,7 +45,7 @@ static constexpr int8_t  PIN_CAN_RESET   = -1; // optional reset pin
 
 SPIClassRP2040 CAN_SPI(spi1, PIN_CAN_MISO, PIN_CAN_CS, PIN_CAN_SCK, PIN_CAN_MOSI);
 
-// ===== MCP2515 register helpers (lifted from CAN_to_Pi_USB) =====
+// ===== MCP2515 register helpers =====
 #define CMD_RESET   0xC0
 #define CMD_READ    0x03
 #define CMD_WRITE   0x02
@@ -203,7 +202,7 @@ void logPinout() {
   Serial.print("#   RESET=");  Serial.println(PIN_CAN_RESET >= 0 ? String(PIN_CAN_RESET) : String("(pull-up on wing)"));
 }
 
-// ===== Telemetry snapshot + helpers (unchanged from legacy sketch) =====
+// ===== Telemetry snapshot =====
 static uint32_t g_pkt_counter     = 0;
 static bool     g_seen_any_frame  = false;
 
@@ -211,10 +210,17 @@ static uint16_t g_rpm             = 0;
 static float    g_tps_pct         = 0.0f;
 static float    g_fot_ms          = 0.0f;
 static float    g_ign_deg         = 0.0f;
+static float    g_rpm_rate        = 0.0f;
+static float    g_tps_rate        = 0.0f;
+static float    g_map_rate        = 0.0f;
+static float    g_maf_load_rate   = 0.0f;
 
 static float    g_baro_kpa        = 0.0f;
 static float    g_map_kpa         = 0.0f;
 static float    g_lambda          = 0.0f;
+static float    g_lambda1         = 0.0f;
+static float    g_lambda2         = 0.0f;
+static float    g_lambda_target   = 0.0f;
 
 static float    g_oil_psi         = 0.0f;
 static float    g_batt_v          = 0.0f;
@@ -226,22 +232,64 @@ static float    g_ws_fr_hz        = 0.0f;
 static float    g_ws_bl_hz        = 0.0f;
 static float    g_ws_br_hz        = 0.0f;
 
+static float    g_ai_v[8]         = {0};
+static float    g_therm5_temp     = 0.0f;
+static float    g_therm7_temp     = 0.0f;
+
+static float    g_rpm_rate        = 0.0f;
+static float    g_tps_rate        = 0.0f;
+static float    g_map_rate        = 0.0f;
+static float    g_maf_load_rate   = 0.0f;
+
+static float    g_pwm_duty_pct[8] = {0};
+static float    g_percent_slip    = 0.0f;
+static float    g_driven_wheel_roc_ft_s2 = 0.0f;
+static float    g_traction_desired_pct   = 0.0f;
+static float    g_driven_avg_ws_ft_s     = 0.0f;
+static float    g_nondriven_avg_ws_ft_s  = 0.0f;
+static float    g_ign_comp_deg          = 0.0f;
+static float    g_ign_cut_pct           = 0.0f;
+static float    g_driven_ws1_ft_s       = 0.0f;
+static float    g_driven_ws2_ft_s       = 0.0f;
+static float    g_nondriven_ws1_ft_s    = 0.0f;
+static float    g_nondriven_ws2_ft_s    = 0.0f;
+static float    g_fuel_comp_accel_pct   = 0.0f;
+static float    g_fuel_comp_start_pct   = 0.0f;
+static float    g_fuel_comp_air_pct     = 0.0f;
+static float    g_fuel_comp_coolant_pct = 0.0f;
+static float    g_fuel_comp_baro_pct    = 0.0f;
+static float    g_fuel_comp_map_pct     = 0.0f;
+static float    g_ign_comp_air_deg      = 0.0f;
+static float    g_ign_comp_coolant_deg  = 0.0f;
+static float    g_ign_comp_baro_deg     = 0.0f;
+static float    g_ign_comp_map_deg      = 0.0f;
+
+// Helpers
 static inline uint16_t u16_lohi(uint8_t lo, uint8_t hi) {
   return (uint16_t)hi << 8 | lo;
 }
 
 static inline int16_t s16_lohi(uint8_t lo, uint8_t hi) {
   uint16_t n = u16_lohi(lo, hi);
-  if (n > 32767) return (int16_t)(n - 65536);
-  return (int16_t)n;
+  return (n > 32767) ? (int16_t)(n - 65536) : (int16_t)n;
 }
 
-static const uint32_t ID_PE1 = 0x0CFFF048;
-static const uint32_t ID_PE2 = 0x0CFFF148;
-static const uint32_t ID_PE3 = 0x0CFFF248;
-static const uint32_t ID_PE5 = 0x0CFFF448;
-static const uint32_t ID_PE6 = 0x0CFFF548;
-static const uint32_t ID_PE9 = 0x0CFFF848;
+static const uint32_t ID_PE1  = 0x0CFFF048;
+static const uint32_t ID_PE2  = 0x0CFFF148;
+static const uint32_t ID_PE3  = 0x0CFFF248;
+static const uint32_t ID_PE4  = 0x0CFFF348;
+static const uint32_t ID_PE5  = 0x0CFFF448;
+static const uint32_t ID_PE6  = 0x0CFFF548;
+static const uint32_t ID_PE7  = 0x0CFFF648;
+static const uint32_t ID_PE8  = 0x0CFFF748;
+static const uint32_t ID_PE9  = 0x0CFFF848;
+static const uint32_t ID_PE10 = 0x0CFFF948;
+static const uint32_t ID_PE11 = 0x0CFFFA48;
+static const uint32_t ID_PE12 = 0x0CFFFB48;
+static const uint32_t ID_PE13 = 0x0CFFFC48;
+static const uint32_t ID_PE14 = 0x0CFFFD48;
+static const uint32_t ID_PE15 = 0x0CFFFE48;
+static const uint32_t ID_PE16 = 0x0CFFD048;
 
 void updateTelemetryFromFrame(const Frame &f) {
   if (!f.ext) return;
@@ -267,11 +315,20 @@ void updateTelemetryFromFrame(const Frame &f) {
       g_baro_kpa = baro_raw * PSI_TO_KPA;
       g_map_kpa  = map_raw  * PSI_TO_KPA;
     }
-    g_lambda = lam_raw;
+    g_lambda1 = lam_raw;
+    g_lambda  = lam_raw;
   }
   else if (f.id == ID_PE3 && f.dlc >= 8) {
-    int16_t raw_op = s16_lohi(f.d[2], f.d[3]);
-    g_oil_psi = (raw_op / 1000.0f) * 25.0f - 12.5f;
+    g_ai_v[0] = s16_lohi(f.d[0], f.d[1]) * 0.001f;
+    g_ai_v[1] = s16_lohi(f.d[2], f.d[3]) * 0.001f;
+    g_ai_v[2] = s16_lohi(f.d[4], f.d[5]) * 0.001f;
+    g_ai_v[3] = s16_lohi(f.d[6], f.d[7]) * 0.001f;
+  }
+  else if (f.id == ID_PE4 && f.dlc >= 8) {
+    g_ai_v[4] = s16_lohi(f.d[0], f.d[1]) * 0.001f;
+    g_ai_v[5] = s16_lohi(f.d[2], f.d[3]) * 0.001f;
+    g_ai_v[6] = s16_lohi(f.d[4], f.d[5]) * 0.001f;
+    g_ai_v[7] = s16_lohi(f.d[6], f.d[7]) * 0.001f;
   }
   else if (f.id == ID_PE5 && f.dlc >= 8) {
     g_ws_fr_hz = s16_lohi(f.d[0], f.d[1]) * 0.2f;
@@ -294,8 +351,59 @@ void updateTelemetryFromFrame(const Frame &f) {
       g_coolant_c = (clt_raw - 32.0f) * (5.0f / 9.0f);
     }
   }
+  else if (f.id == ID_PE7 && f.dlc >= 4) {
+    g_therm5_temp = s16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_therm7_temp = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+  }
+  else if (f.id == ID_PE8 && f.dlc >= 8) {
+    g_rpm_rate      = s16_lohi(f.d[0], f.d[1]) * 1.0f;
+    g_tps_rate      = s16_lohi(f.d[2], f.d[3]) * 1.0f;
+    g_map_rate      = s16_lohi(f.d[4], f.d[5]) * 1.0f;
+    g_maf_load_rate = s16_lohi(f.d[6], f.d[7]) * 0.1f;
+  }
   else if (f.id == ID_PE9 && f.dlc >= 2) {
-    g_lambda = s16_lohi(f.d[0], f.d[1]) * 0.01f;
+    g_lambda1 = s16_lohi(f.d[0], f.d[1]) * 0.01f;
+    g_lambda  = g_lambda1;
+    if (f.dlc >= 4) g_lambda2       = s16_lohi(f.d[2], f.d[3]) * 0.01f;
+    if (f.dlc >= 6) g_lambda_target = s16_lohi(f.d[4], f.d[5]) * 0.01f;
+  }
+  else if (f.id == ID_PE10 && f.dlc >= 1) {
+    for (uint8_t i = 0; i < min<uint8_t>(8, f.dlc); ++i) {
+      g_pwm_duty_pct[i] = f.d[i] * 0.5f;
+    }
+  }
+  else if (f.id == ID_PE11 && f.dlc >= 6) {
+    g_percent_slip          = s16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_driven_wheel_roc_ft_s2 = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+    g_traction_desired_pct   = s16_lohi(f.d[4], f.d[5]) * 0.1f;
+  }
+  else if (f.id == ID_PE12 && f.dlc >= 8) {
+    g_driven_avg_ws_ft_s    = s16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_nondriven_avg_ws_ft_s = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+    g_ign_comp_deg          = s16_lohi(f.d[4], f.d[5]) * 0.1f;
+    g_ign_cut_pct           = s16_lohi(f.d[6], f.d[7]) * 0.1f;
+  }
+  else if (f.id == ID_PE13 && f.dlc >= 8) {
+    g_driven_ws1_ft_s    = s16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_driven_ws2_ft_s    = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+    g_nondriven_ws1_ft_s = s16_lohi(f.d[4], f.d[5]) * 0.1f;
+    g_nondriven_ws2_ft_s = s16_lohi(f.d[6], f.d[7]) * 0.1f;
+  }
+  else if (f.id == ID_PE14 && f.dlc >= 8) {
+    g_fuel_comp_accel_pct   = s16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_fuel_comp_start_pct   = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+    g_fuel_comp_air_pct     = s16_lohi(f.d[4], f.d[5]) * 0.1f;
+    g_fuel_comp_coolant_pct = s16_lohi(f.d[6], f.d[7]) * 0.1f;
+  }
+  else if (f.id == ID_PE15 && f.dlc >= 4) {
+    g_fuel_comp_baro_pct = s16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_fuel_comp_map_pct  = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+  }
+  else if (f.id == ID_PE16 && f.dlc >= 8) {
+    g_ign_comp_air_deg     = s16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_ign_comp_coolant_deg = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+    g_ign_comp_baro_deg    = s16_lohi(f.d[4], f.d[5]) * 0.1f;
+    g_ign_comp_map_deg     = s16_lohi(f.d[6], f.d[7]) * 0.1f;
   }
 }
 
@@ -329,6 +437,8 @@ void sendTelemetryJson() {
   add_kv("baro_kpa"); Serial.print(g_baro_kpa, 2);
   add_kv("map_kpa");  Serial.print(g_map_kpa, 2);
   add_kv("lambda");   Serial.print(g_lambda, 3);
+  add_kv("lambda2");  Serial.print(g_lambda2, 3);
+  add_kv("lambda_target"); Serial.print(g_lambda_target, 3);
 
   add_kv("batt_v");     Serial.print(g_batt_v, 2);
   add_kv("coolant_c");  Serial.print(g_coolant_c, 1);
@@ -339,6 +449,51 @@ void sendTelemetryJson() {
   add_kv("ws_fr_hz"); Serial.print(g_ws_fr_hz, 1);
   add_kv("ws_bl_hz"); Serial.print(g_ws_bl_hz, 1);
   add_kv("ws_br_hz"); Serial.print(g_ws_br_hz, 1);
+
+  for (int i = 0; i < 8; ++i) {
+    char key[12];
+    snprintf(key, sizeof(key), "ai%d_v", i + 1);
+    add_kv(key); Serial.print(g_ai_v[i], 3);
+  }
+
+  add_kv("therm5_temp"); Serial.print(g_therm5_temp, 1);
+  add_kv("therm7_temp"); Serial.print(g_therm7_temp, 1);
+
+  add_kv("rpm_rate_rps");    Serial.print(g_rpm_rate, 1);
+  add_kv("tps_rate_pct_s"); Serial.print(g_tps_rate, 1);
+  add_kv("map_rate");       Serial.print(g_map_rate, 1);
+  add_kv("maf_load_rate");  Serial.print(g_maf_load_rate, 1);
+
+  for (int i = 0; i < 8; ++i) {
+    char key[18];
+    snprintf(key, sizeof(key), "pwm_duty_pct_%d", i + 1);
+    add_kv(key); Serial.print(g_pwm_duty_pct[i], 1);
+  }
+
+  add_kv("percent_slip");        Serial.print(g_percent_slip, 1);
+  add_kv("driven_wheel_roc");    Serial.print(g_driven_wheel_roc_ft_s2, 1);
+  add_kv("traction_desired_pct"); Serial.print(g_traction_desired_pct, 1);
+  add_kv("driven_avg_ws_ft_s");   Serial.print(g_driven_avg_ws_ft_s, 1);
+  add_kv("nondriven_avg_ws_ft_s"); Serial.print(g_nondriven_avg_ws_ft_s, 1);
+  add_kv("ign_comp_deg");        Serial.print(g_ign_comp_deg, 1);
+  add_kv("ign_cut_pct");         Serial.print(g_ign_cut_pct, 1);
+
+  add_kv("driven_ws1_ft_s");    Serial.print(g_driven_ws1_ft_s, 1);
+  add_kv("driven_ws2_ft_s");    Serial.print(g_driven_ws2_ft_s, 1);
+  add_kv("nondriven_ws1_ft_s"); Serial.print(g_nondriven_ws1_ft_s, 1);
+  add_kv("nondriven_ws2_ft_s"); Serial.print(g_nondriven_ws2_ft_s, 1);
+
+  add_kv("fuel_comp_accel_pct");   Serial.print(g_fuel_comp_accel_pct, 1);
+  add_kv("fuel_comp_start_pct");   Serial.print(g_fuel_comp_start_pct, 1);
+  add_kv("fuel_comp_air_pct");     Serial.print(g_fuel_comp_air_pct, 1);
+  add_kv("fuel_comp_coolant_pct"); Serial.print(g_fuel_comp_coolant_pct, 1);
+  add_kv("fuel_comp_baro_pct");    Serial.print(g_fuel_comp_baro_pct, 1);
+  add_kv("fuel_comp_map_pct");     Serial.print(g_fuel_comp_map_pct, 1);
+
+  add_kv("ign_comp_air_deg");     Serial.print(g_ign_comp_air_deg, 1);
+  add_kv("ign_comp_coolant_deg"); Serial.print(g_ign_comp_coolant_deg, 1);
+  add_kv("ign_comp_baro_deg");    Serial.print(g_ign_comp_baro_deg, 1);
+  add_kv("ign_comp_map_deg");     Serial.print(g_ign_comp_map_deg, 1);
 
   Serial.println('}');
 }
@@ -464,7 +619,7 @@ void loop() {
 
   if (intf & RX1IF) {
     readRx(RXB1SIDH, f);
-    mcpBitMod(CANINTF, RX1IF, 0x00);
+    mcpBitMod(CANINTF, RX1IF, 0.00);
     printFrameDebug(f);
     updateTelemetryFromFrame(f);
   }

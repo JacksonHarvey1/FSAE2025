@@ -64,9 +64,29 @@ def _resolve_serial_port() -> str:
 
 PORT = _resolve_serial_port()
 BAUD = int(os.getenv("TELEM_BAUD", "921600"))
-KEYS = [k.strip() for k in os.getenv(
-    "TELEM_KEYS", "rpm,tps_pct,map_kpa,batt_v,coolant_c"
-).split(",") if k.strip()]
+DEFAULT_KEYS = ",".join(
+    [
+        "ts_ms","pkt","rpm","tps_pct","fot_ms","ign_deg",
+        "rpm_rate_rps","tps_rate_pct_s","map_rate","maf_load_rate",
+        "baro_kpa","map_kpa","lambda","lambda2","lambda_target",
+        "batt_v","coolant_c","air_c","oil_psi",
+        "ws_fl_hz","ws_fr_hz","ws_bl_hz","ws_br_hz",
+        "therm5_temp","therm7_temp",
+        "pwm_duty_pct_1","pwm_duty_pct_2","pwm_duty_pct_3","pwm_duty_pct_4",
+        "pwm_duty_pct_5","pwm_duty_pct_6","pwm_duty_pct_7","pwm_duty_pct_8",
+        "percent_slip","driven_wheel_roc","traction_desired_pct",
+        "driven_avg_ws_ft_s","nondriven_avg_ws_ft_s",
+        "ign_comp_deg","ign_cut_pct",
+        "driven_ws1_ft_s","driven_ws2_ft_s",
+        "nondriven_ws1_ft_s","nondriven_ws2_ft_s",
+        "fuel_comp_accel_pct","fuel_comp_start_pct",
+        "fuel_comp_air_pct","fuel_comp_coolant_pct",
+        "fuel_comp_baro_pct","fuel_comp_map_pct",
+        "ign_comp_air_deg","ign_comp_coolant_deg",
+        "ign_comp_baro_deg","ign_comp_map_deg"
+    ]
+)
+KEYS = [k.strip() for k in os.getenv("TELEM_KEYS", DEFAULT_KEYS).split(",") if k.strip()]
 
 WINDOW_SECONDS = float(os.getenv("TELEM_WINDOW_S", "30"))
 MAX_POINTS = int(os.getenv("TELEM_MAX_POINTS", "5000"))
