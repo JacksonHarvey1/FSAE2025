@@ -44,7 +44,7 @@ raw-value tables, a dark theme, and live status indicators.
 
    | Variable | Purpose | Default |
    | --- | --- | --- |
-   | `TELEM_PORT` | Serial path to RP2040 | `/dev/serial/by-id/...` |
+   | `TELEM_PORT` | Serial path to RP2040 (override auto-detect) | `/dev/serial/by-id/...` |
    | `TELEM_BAUD` | Baud rate | `921600` |
    | `TELEM_KEYS` | Comma list of fields to plot/table | `rpm,tps_pct,map_kpa,batt_v,coolant_c` |
    | `TELEM_WINDOW_S` | Rolling window length | `30` |
@@ -193,7 +193,7 @@ All stack assets live in `Dyno/stack/`.
     export INFLUX_BUCKET="telemetry"
     export INFLUX_TOKEN_FILE="$HOME/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token"
 
-    export TELEM_PORT="/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00"
+    # TELEM_PORT left unset => Dyno_Final.py auto-detects the Feather via /dev/serial/by-id
     export TELEM_BAUD="921600"
 
     export TELEM_SYSTEM="dyno"     # Influx tag

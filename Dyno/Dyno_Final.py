@@ -22,6 +22,7 @@ python -m pip install dash dash-bootstrap-components plotly pyserial
 
 from __future__ import annotations
 
+import glob
 import json
 import math
 import os
@@ -42,10 +43,26 @@ from dash import Dash, Input, Output, State, dash_table, dcc, html
 import plotly.graph_objects as go
 
 # ------------------ CONFIG ------------------
-PORT = os.getenv(
-    "TELEM_PORT",
-    "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00",
-)
+DEFAULT_PORT_PATTERNS = [
+    "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_*",
+    "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_*",
+    "/dev/ttyACM*",
+]
+DEFAULT_PORT_FALLBACK = "/dev/ttyACM0"
+
+
+def _resolve_serial_port() -> str:
+    env_port = os.getenv("TELEM_PORT")
+    if env_port:
+        return env_port
+    for pattern in DEFAULT_PORT_PATTERNS:
+        matches = sorted(glob.glob(pattern))
+        if matches:
+            return matches[0]
+    return DEFAULT_PORT_FALLBACK
+
+
+PORT = _resolve_serial_port()
 BAUD = int(os.getenv("TELEM_BAUD", "921600"))
 KEYS = [k.strip() for k in os.getenv(
     "TELEM_KEYS", "rpm,tps_pct,map_kpa,batt_v,coolant_c"
