@@ -104,7 +104,7 @@ APP_REFRESH_MS = int(os.getenv("DYNO_APP_REFRESH_MS", "200"))
 
 RATE_WINDOW = 5.0  # seconds for rolling rate estimate
 STALE_THRESHOLD = 2.5  # show warning if no pkt within this window
-DEBUG_SERIAL = os.getenv("TELEM_DEBUG", "1") == "0"
+DEBUG_SERIAL = True
 # --------------------------------------------
 
 
@@ -286,15 +286,14 @@ def _read_loop(ser: "serial.Serial") -> None:
         )
         if not line or line.startswith(("#", "DBG")) or not line.startswith("{"):
             update_status(lines_ignored=get_status().get("lines_ignored", 0) + 1)
-            if DEBUG_SERIAL and line:
+            if line:
                 print(f"[serial] ignored: {line[:160]}")
             continue
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
             update_status(lines_bad_json=get_status().get("lines_bad_json", 0) + 1)
-            if DEBUG_SERIAL:
-                print(f"[serial] bad json: {line[:160]}")
+            print(f"[serial] bad json: {line[:160]}")
             continue
         update_status(lines_json=get_status().get("lines_json", 0) + 1)
         pkt = obj.get("pkt")
