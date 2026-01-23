@@ -104,7 +104,7 @@ APP_REFRESH_MS = int(os.getenv("DYNO_APP_REFRESH_MS", "200"))
 
 RATE_WINDOW = 5.0  # seconds for rolling rate estimate
 STALE_THRESHOLD = 2.5  # show warning if no pkt within this window
-DEBUG_SERIAL = os.getenv("TELEM_DEBUG", "0") == "1"
+DEBUG_SERIAL = os.getenv("TELEM_DEBUG", "1") == "0"
 # --------------------------------------------
 
 
