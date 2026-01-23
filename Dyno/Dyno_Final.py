@@ -287,17 +287,17 @@ def _read_loop(ser: "serial.Serial") -> None:
         )
         if not line or line.startswith(("#", "DBG")) or not line.startswith("{"):
             update_status(lines_ignored=get_status().get("lines_ignored", 0) + 1)
-            if line:
-                print(f"[serial] ignored: {line}")
             continue
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
             update_status(lines_bad_json=get_status().get("lines_bad_json", 0) + 1)
-            print(f"[serial] bad json: {line}")
+            if DEBUG_SERIAL:
+                print(f"[serial] bad json: {line}")
             continue
         update_status(lines_json=get_status().get("lines_json", 0) + 1)
-        print(f"[serial] json: {line}")
+        if DEBUG_SERIAL:
+            print(f"[serial] json: {line}")
         pkt = obj.get("pkt")
         if pkt is not None and pkt == last_pkt:
             continue
