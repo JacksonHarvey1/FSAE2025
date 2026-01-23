@@ -29,6 +29,8 @@ import os
 import threading
 import time
 import logging
+import sys
+import traceback
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Deque, Dict, List, Optional
@@ -697,4 +699,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BaseException as exc:
+        print(f"Dyno_Final crashed: {exc}", file=sys.stderr)
+        traceback.print_exc()
+        raise
