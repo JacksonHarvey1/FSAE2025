@@ -296,6 +296,7 @@ def _read_loop(ser: "serial.Serial") -> None:
             print(f"[serial] bad json: {line[:160]}")
             continue
         update_status(lines_json=get_status().get("lines_json", 0) + 1)
+        print(f"[serial] json: {line[:160]}")
         pkt = obj.get("pkt")
         if pkt is not None and pkt == last_pkt:
             continue
@@ -661,6 +662,10 @@ def _build_status_banner(snapshot: TelemetrySnapshot, status: Dict[str, Any]) ->
         last_line = status.get("last_line")
         if last_line:
             message += f" | last line: {last_line}"
+        message += (
+            f" | total={status.get('lines_total', 0)} json={status.get('lines_json', 0)} "
+            f"ignored={status.get('lines_ignored', 0)} bad={status.get('lines_bad_json', 0)}"
+        )
     else:
         color = "danger"
         message = "Waiting for serial data…"
