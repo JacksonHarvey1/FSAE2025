@@ -28,6 +28,7 @@ import math
 import os
 import threading
 import time
+import logging
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Deque, Dict, List, Optional
@@ -287,16 +288,16 @@ def _read_loop(ser: "serial.Serial") -> None:
         if not line or line.startswith(("#", "DBG")) or not line.startswith("{"):
             update_status(lines_ignored=get_status().get("lines_ignored", 0) + 1)
             if line:
-                print(f"[serial] ignored: {line[:160]}")
+                print(f"[serial] ignored: {line}")
             continue
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
             update_status(lines_bad_json=get_status().get("lines_bad_json", 0) + 1)
-            print(f"[serial] bad json: {line[:160]}")
+            print(f"[serial] bad json: {line}")
             continue
         update_status(lines_json=get_status().get("lines_json", 0) + 1)
-        print(f"[serial] json: {line[:160]}")
+        print(f"[serial] json: {line}")
         pkt = obj.get("pkt")
         if pkt is not None and pkt == last_pkt:
             continue
@@ -682,7 +683,17 @@ def main() -> None:
     else:
         threading.Thread(target=serial_worker, daemon=True).start()
 
-    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)
+    werkzeug_logger = logging.getLogger("werkzeug")
+    werkzeug_logger.setLevel(logging.ERROR)
+    werkzeug_logger.propagate = False
+    app.logger.disabled = True
+
+    app.run(
+        host=APP_HOST,
+        port=APP_PORT,
+        debug=APP_DEBUG,
+        dev_tools_silence_routes_logging=True,
+    )
 
 
 if __name__ == "__main__":

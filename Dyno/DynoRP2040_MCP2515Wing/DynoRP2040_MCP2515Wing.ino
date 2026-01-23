@@ -42,6 +42,8 @@ static constexpr int8_t  PIN_CAN_RESET   = -1; // optional reset pin
 
 // Toggle to 1 if INT is wired and you want level-triggered reception.
 #define USE_CAN_INTERRUPT 0
+// Set to 1 to print every CAN frame (very chatty; can corrupt JSON at 115200).
+#define CAN_DEBUG 0
 
 SPIClassRP2040 CAN_SPI(spi1, PIN_CAN_MISO, PIN_CAN_CS, PIN_CAN_SCK, PIN_CAN_MOSI);
 
@@ -591,14 +593,18 @@ void loop() {
     uint8_t tec  = mcpRead(TEC);
     uint8_t rec  = mcpRead(REC);
 
-    Serial.print("# STAT CANINTF=0x"); Serial.print(intf, HEX);
-    Serial.print(" EFLG=0x");         Serial.print(eflg, HEX);
-    Serial.print(" TEC=");             Serial.print(tec);
-    Serial.print(" REC=");             Serial.println(rec);
+    if (CAN_DEBUG) {
+      Serial.print("# STAT CANINTF=0x"); Serial.print(intf, HEX);
+      Serial.print(" EFLG=0x");         Serial.print(eflg, HEX);
+      Serial.print(" TEC=");             Serial.print(tec);
+      Serial.print(" REC=");             Serial.println(rec);
+    }
 
     if (eflg & 0x60) {
       mcpBitMod(EFLG, 0x60, 0x00);
-      Serial.println("# cleared RX overflow flags");
+      if (CAN_DEBUG) {
+        Serial.println("# cleared RX overflow flags");
+      }
     }
   }
 
@@ -608,14 +614,18 @@ void loop() {
   if (intf & RX0IF) {
     readRx(RXB0SIDH, f);
     mcpBitMod(CANINTF, RX0IF, 0x00);
-    printFrameDebug(f);
+    if (CAN_DEBUG) {
+      printFrameDebug(f);
+    }
     updateTelemetryFromFrame(f);
   }
 
   if (intf & RX1IF) {
     readRx(RXB1SIDH, f);
     mcpBitMod(CANINTF, RX1IF, 0.00);
-    printFrameDebug(f);
+    if (CAN_DEBUG) {
+      printFrameDebug(f);
+    }
     updateTelemetryFromFrame(f);
   }
 
