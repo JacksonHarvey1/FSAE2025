@@ -1,36 +1,21 @@
-[serial] ignored: # RP2040 + MCP2515 dyno bridge starting
-[serial] ignored: # Output: NDJSON ~20 Hz. '#' lines = status.
-[serial] ignored: # Wiring summary (RP2040 → MCP2515 wing):
-[serial] ignored: #   CS=GP5  SCK=GP14  MOSI=GP15  MISO=GP8
-[serial] ignored: #   INT=(unused)
-[serial] ignored: #   STBY=(pull-down on wing)
-[serial] ignored: #   RESET=(pull-up on wing)
-[serial] ignored: # MCP2515 init 250k/16MHz => OK
-[serial] ignored: # CANSTAT=0xC
-[serial] ignored: DBG RX EXT ID=0xCFFD048 DLC=8 DATA=00 00 1A 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF748 DLC=8 DATA=00 00 00 00 01 01 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF848 DLC=8 DATA=00 05 00 00 E8 03 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF248 DLC=8 DATA=88 13 08 00 09 00 09 00
-[serial] ignored: DBG RX EXT ID=0xCFFF948 DLC=8 DATA=00 00 00 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF348 DLC=8 DATA=09 00 05 00 07 00 25 00
-[serial] ignored: DBG RX EXT ID=0xCFFFA48 DLC=8 DATA=00 00 00 00 00 00 FF FF
-[serial] ignored: DBG RX EXT ID=0xCFFF448 DLC=8 DATA=00 00 00 00 00 00 00 00
+[serial] json: {"ts_ms":244279,"pkt":4851,"src":"can","node_id":1,"rpm":0,"tps_pct":0.0,"fot_ms":46.7,"ign_deg":5.0,"baro_kpa":69.63,"map_kpa":75.84,"lambda":12.800,"lambda2":
+[serial] ignored: # STAT CANINTF=0xA0 EFLG=0x0 TEC=0 REC=0
+127.0.0.1 - - [23/Jan/2026 16:27:49] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:49] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:50] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:50] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:50] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:51] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:51] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:51] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:52] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:52] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:27:54] "POST /_dash-update-component HTTP/1.1" 200 -
+[serial] bad json: {"ts_ms":244329,"pkt":4852,"src":"can","node_id":1,"rpm":0,"tps_pct":0.0,"fot_ms":46.7,"ign_deg":5.0,"baro_kpa":69.63,"map_kpa":75.84,"lambda":12.800,"lambda2":
 [serial] ignored: DBG RX EXT ID=0xCFFFB48 DLC=8 DATA=00 00 00 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF048 DLC=8 DATA=00 00 00 00 D0 01 32 00
-[serial] ignored: DBG RX EXT ID=0xCFFFC48 DLC=8 DATA=00 00 00 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF148 DLC=8 DATA=33 1B A0 1D 00 05 01 FF
-[serial] ignored: DBG RX EXT ID=0xCFFFD48 DLC=8 DATA=E8 03 CF 04 F0 03 80 04
-[serial] ignored: DBG RX EXT ID=0xCFFFE48 DLC=8 DATA=E8 03 EF 02 FF FF FF FF
-[serial] ignored: DBG RX EXT ID=0xCFFD048 DLC=8 DATA=00 00 1B 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF048 DLC=8 DATA=00 00 00 00 D0 01 32 00
-[serial] ignored: DBG RX EXT ID=0xCFFF748 DLC=8 DATA=00 00 00 00 FF FF 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF148 DLC=8 DATA=33 1B 99 1D 00 05 01 FF
-[serial] ignored: DBG RX EXT ID=0xCFFF848 DLC=8 DATA=00 05 00 00 E8 03 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF248 DLC=8 DATA=88 13 09 00 09 00 09 00
-[serial] ignored: DBG RX EXT ID=0xCFFF948 DLC=8 DATA=00 00 00 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF348 DLC=8 DATA=09 00 06 00 05 00 28 00
-[serial] ignored: DBG RX EXT ID=0xCFFFA48 DLC=8 DATA=00 00 00 00 00 00 FF FF
-[serial] ignored: DBG RX EXT ID=0xCFFF448 DLC=8 DATA=00 00 00 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFFB48 DLC=8 DATA=00 00 00 00 00 00 00 00
-[serial] ignored: DBG RX EXT ID=0xCFFF048 DLC=8 DATA=00 00 00 00 D0 01 32 00
-[serial] ignored: DBG RX EXT ID=0xCFFFC48 DLC=8 DATA=00 00 00 00 00 00 00 00
+127.0.0.1 - - [23/Jan/2026 16:28:11] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:28:11] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:28:11] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:28:12] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:28:13] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [23/Jan/2026 16:28:15] "POST /_dash-update-component HTTP/1.1" 200 -
