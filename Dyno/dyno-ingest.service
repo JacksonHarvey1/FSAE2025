@@ -19,8 +19,8 @@ Environment=INFLUX_BUCKET=telemetry
 Environment=INFLUX_TOKEN_FILE=/home/jackson/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token
 
 # Serial settings (defaults match Dyno/dyno_simple.py)
-Environment=TELEM_PORT=/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00
-Environment=TELEM_BAUD=921600
+Environment=TELEM_PORT=/dev/ttyACM0
+Environment=TELEM_BAUD=115200
 
 # Tags
 Environment=TELEM_SYSTEM=dyno
