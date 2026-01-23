@@ -236,11 +236,6 @@ static float    g_ai_v[8]         = {0};
 static float    g_therm5_temp     = 0.0f;
 static float    g_therm7_temp     = 0.0f;
 
-static float    g_rpm_rate        = 0.0f;
-static float    g_tps_rate        = 0.0f;
-static float    g_map_rate        = 0.0f;
-static float    g_maf_load_rate   = 0.0f;
-
 static float    g_pwm_duty_pct[8] = {0};
 static float    g_percent_slip    = 0.0f;
 static float    g_driven_wheel_roc_ft_s2 = 0.0f;
@@ -378,16 +373,16 @@ void updateTelemetryFromFrame(const Frame &f) {
     g_traction_desired_pct   = s16_lohi(f.d[4], f.d[5]) * 0.1f;
   }
   else if (f.id == ID_PE12 && f.dlc >= 8) {
-    g_driven_avg_ws_ft_s    = s16_lohi(f.d[0], f.d[1]) * 0.1f;
-    g_nondriven_avg_ws_ft_s = s16_lohi(f.d[2], f.d[3]) * 0.1f;
+    g_driven_avg_ws_ft_s    = u16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_nondriven_avg_ws_ft_s = u16_lohi(f.d[2], f.d[3]) * 0.1f;
     g_ign_comp_deg          = s16_lohi(f.d[4], f.d[5]) * 0.1f;
     g_ign_cut_pct           = s16_lohi(f.d[6], f.d[7]) * 0.1f;
   }
   else if (f.id == ID_PE13 && f.dlc >= 8) {
-    g_driven_ws1_ft_s    = s16_lohi(f.d[0], f.d[1]) * 0.1f;
-    g_driven_ws2_ft_s    = s16_lohi(f.d[2], f.d[3]) * 0.1f;
-    g_nondriven_ws1_ft_s = s16_lohi(f.d[4], f.d[5]) * 0.1f;
-    g_nondriven_ws2_ft_s = s16_lohi(f.d[6], f.d[7]) * 0.1f;
+    g_driven_ws1_ft_s    = u16_lohi(f.d[0], f.d[1]) * 0.1f;
+    g_driven_ws2_ft_s    = u16_lohi(f.d[2], f.d[3]) * 0.1f;
+    g_nondriven_ws1_ft_s = u16_lohi(f.d[4], f.d[5]) * 0.1f;
+    g_nondriven_ws2_ft_s = u16_lohi(f.d[6], f.d[7]) * 0.1f;
   }
   else if (f.id == ID_PE14 && f.dlc >= 8) {
     g_fuel_comp_accel_pct   = s16_lohi(f.d[0], f.d[1]) * 0.1f;

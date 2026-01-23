@@ -104,6 +104,7 @@ APP_REFRESH_MS = int(os.getenv("DYNO_APP_REFRESH_MS", "200"))
 
 RATE_WINDOW = 5.0  # seconds for rolling rate estimate
 STALE_THRESHOLD = 2.5  # show warning if no pkt within this window
+DEBUG_SERIAL = os.getenv("TELEM_DEBUG", "0") == "1"
 # --------------------------------------------
 
 
@@ -217,6 +218,12 @@ _serial_status: Dict[str, Any] = {
     "last_error": None,
     "last_connect_ts": None,
     "last_packet_ts": None,
+    "last_line_ts": None,
+    "last_line": None,
+    "lines_total": 0,
+    "lines_json": 0,
+    "lines_bad_json": 0,
+    "lines_ignored": 0,
 }
 
 
@@ -271,18 +278,31 @@ def _read_loop(ser: "serial.Serial") -> None:
         if not raw:
             continue
         line = raw.decode(errors="ignore").strip()
+        now = time.time()
+        update_status(
+            last_line_ts=now,
+            last_line=line[:160],
+            lines_total=get_status().get("lines_total", 0) + 1,
+        )
         if not line or line.startswith(("#", "DBG")) or not line.startswith("{"):
+            update_status(lines_ignored=get_status().get("lines_ignored", 0) + 1)
+            if DEBUG_SERIAL and line:
+                print(f"[serial] ignored: {line[:160]}")
             continue
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
+            update_status(lines_bad_json=get_status().get("lines_bad_json", 0) + 1)
+            if DEBUG_SERIAL:
+                print(f"[serial] bad json: {line[:160]}")
             continue
+        update_status(lines_json=get_status().get("lines_json", 0) + 1)
         pkt = obj.get("pkt")
         if pkt is not None and pkt == last_pkt:
             continue
         last_pkt = pkt
         BUFFER.append(obj)
-        update_status(last_packet_ts=time.time())
+        update_status(last_packet_ts=now)
 
 
 def fake_data_worker() -> None:
@@ -639,6 +659,9 @@ def _build_status_banner(snapshot: TelemetrySnapshot, status: Dict[str, Any]) ->
         color = "warning"
         age = now - last_packet_ts if last_packet_ts else float("inf")
         message = f"Connected but no packets for {age:.1f}s"
+        last_line = status.get("last_line")
+        if last_line:
+            message += f" | last line: {last_line}"
     else:
         color = "danger"
         message = "Waiting for serial data…"
