@@ -63,7 +63,7 @@ def _resolve_serial_port() -> str:
 
 
 PORT = _resolve_serial_port()
-BAUD = int(os.getenv("TELEM_BAUD", "921600"))
+BAUD = int(os.getenv("TELEM_BAUD", "115200"))
 DEFAULT_KEYS = ",".join(
     [
         "ts_ms","pkt","rpm","tps_pct","fot_ms","ign_deg",

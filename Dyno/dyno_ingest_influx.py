@@ -38,7 +38,7 @@ PORT = os.getenv(
     "TELEM_PORT",
     "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00",
 )
-BAUD = int(os.getenv("TELEM_BAUD", "921600"))
+BAUD = int(os.getenv("TELEM_BAUD", "115200"))
 
 
 # ---- INFLUX CONFIG ----
