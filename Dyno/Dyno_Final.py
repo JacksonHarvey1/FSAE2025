@@ -67,32 +67,18 @@ def _resolve_serial_port() -> str:
 
 PORT = _resolve_serial_port()
 BAUD = int(os.getenv("TELEM_BAUD", "115200"))
+
+# OPTIMIZED FOR RASPBERRY PI - Limited fields for better performance
+# Use env var TELEM_KEYS to override with full field list when needed
 DEFAULT_KEYS = ",".join(
     [
-        "ts_ms","pkt","rpm","tps_pct","fot_ms","ign_deg",
-        "rpm_rate_rps","tps_rate_pct_s","map_rate","maf_load_rate",
-        "baro_kpa","map_kpa","lambda","lambda2","lambda_target",
-        "batt_v","coolant_c","air_c","oil_psi",
-        "ws_fl_hz","ws_fr_hz","ws_bl_hz","ws_br_hz",
-        "therm5_temp","therm7_temp",
-        "pwm_duty_pct_1","pwm_duty_pct_2","pwm_duty_pct_3","pwm_duty_pct_4",
-        "pwm_duty_pct_5","pwm_duty_pct_6","pwm_duty_pct_7","pwm_duty_pct_8",
-        "percent_slip","driven_wheel_roc","traction_desired_pct",
-        "driven_avg_ws_ft_s","nondriven_avg_ws_ft_s",
-        "ign_comp_deg","ign_cut_pct",
-        "driven_ws1_ft_s","driven_ws2_ft_s",
-        "nondriven_ws1_ft_s","nondriven_ws2_ft_s",
-        "fuel_comp_accel_pct","fuel_comp_start_pct",
-        "fuel_comp_air_pct","fuel_comp_coolant_pct",
-        "fuel_comp_baro_pct","fuel_comp_map_pct",
-        "ign_comp_air_deg","ign_comp_coolant_deg",
-        "ign_comp_baro_deg","ign_comp_map_deg"
+        "rpm","tps_pct","map_kpa","batt_v","coolant_c","air_c"
     ]
 )
 KEYS = [k.strip() for k in os.getenv("TELEM_KEYS", DEFAULT_KEYS).split(",") if k.strip()]
 
 WINDOW_SECONDS = float(os.getenv("TELEM_WINDOW_S", "30"))
-MAX_POINTS = int(os.getenv("TELEM_MAX_POINTS", "5000"))
+MAX_POINTS = int(os.getenv("TELEM_MAX_POINTS", "1000"))  # Reduced for Pi performance
 RAW_TABLE_ROWS = int(os.getenv("TELEM_RAW_ROWS", "120"))
 
 USE_FAKE_DATA = os.getenv("TELEM_FAKE_DATA", "0") == "1"
@@ -103,11 +89,11 @@ APP_PORT = int(os.getenv("DYNO_APP_PORT", "8050"))
 APP_DEBUG = os.getenv("DYNO_APP_DEBUG", "0") == "1"
 THEME_NAME = os.getenv("DYNO_APP_THEME", "CYBORG")
 THEME = getattr(dbc.themes, THEME_NAME, dbc.themes.CYBORG)
-APP_REFRESH_MS = int(os.getenv("DYNO_APP_REFRESH_MS", "200"))
+APP_REFRESH_MS = int(os.getenv("DYNO_APP_REFRESH_MS", "1000"))  # Reduced for Pi (was 200)
 
 RATE_WINDOW = 5.0  # seconds for rolling rate estimate
 STALE_THRESHOLD = 2.5  # show warning if no pkt within this window
-DEBUG_SERIAL = True
+DEBUG_SERIAL = False  # Disabled for Pi performance (was True)
 # --------------------------------------------
 
 
