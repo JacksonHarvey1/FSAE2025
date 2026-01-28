@@ -164,10 +164,27 @@ def make_point(obj: Dict[str, Any]) -> Optional[Point]:
 
 
 def main() -> None:
+    # Print configuration for debugging
+    print("=" * 60)
+    print("Dyno Telemetry Ingest Starting")
+    print("=" * 60)
+    print(f"InfluxDB URL:    {INFLUX_URL}")
+    print(f"Organization:    {INFLUX_ORG}")
+    print(f"Bucket:          {INFLUX_BUCKET}")
+    print(f"Token file:      {INFLUX_TOKEN_FILE}")
+    print(f"Serial port:     {PORT}")
+    print(f"Baud rate:       {BAUD}")
+    print("=" * 60)
+    print()
+    
     token = load_token()
-
+    print(f"[influx] Token loaded ({len(token)} chars)")
+    
+    print(f"[influx] Connecting to {INFLUX_URL}...")
     influx = InfluxDBClient(url=INFLUX_URL, token=token, org=INFLUX_ORG)
     write_api = influx.write_api(write_options=SYNCHRONOUS)
+    print("[influx] Connected successfully")
+    print()
 
     ser = open_serial_forever()
 
