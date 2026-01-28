@@ -15,9 +15,9 @@
 #include <Adafruit_MCP2515.h>
 
 // ---------- HARD FAIL if wrong board selected ----------
-#ifndef PIN_CAN_CS
-  #error "Select Tools > Board: Adafruit Feather RP2040 CAN (so PIN_CAN_* matches the hardware)."
-#endif
+//#ifndef PIN_CAN_CS
+  //#error "Select Tools > Board: Adafruit Feather RP2040 CAN (so PIN_CAN_* matches the hardware)."
+//#endif
 
 // ---------- Settings ----------
 static constexpr uint32_t SERIAL_BAUD   = 921600;

@@ -66,7 +66,7 @@ def _resolve_serial_port() -> str:
 
 
 PORT = _resolve_serial_port()
-BAUD = int(os.getenv("TELEM_BAUD", "115200"))
+BAUD = int(os.getenv("TELEM_BAUD", "921600"))  # Match DynoRP204CANHATINtegration.ino baud rate
 
 # OPTIMIZED FOR RASPBERRY PI - Limited fields for better performance
 # Use env var TELEM_KEYS to override with full field list when needed
