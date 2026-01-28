@@ -58,9 +58,24 @@ INFLUX_URL = os.getenv("INFLUX_URL", "http://localhost:8086")
 INFLUX_ORG = os.getenv("INFLUX_ORG", "yorkracing")
 INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "telemetry")
 
+# Auto-find token file if not specified
+def find_token_file():
+    """Try to find the InfluxDB token file automatically"""
+    # Check common locations
+    possible_paths = [
+        os.path.join(os.path.expanduser("~"), "FSAE2025/Dyno/stack/secrets/influxdb2-admin-token"),
+        os.path.join(os.path.dirname(__file__), "stack/secrets/influxdb2-admin-token"),
+        "./stack/secrets/influxdb2-admin-token",
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    return None
+
 # Prefer token from file (safer than putting it in shell history)
 INFLUX_TOKEN = os.getenv("INFLUX_TOKEN", "").strip()
-INFLUX_TOKEN_FILE = os.getenv("INFLUX_TOKEN_FILE", "").strip()
+INFLUX_TOKEN_FILE = os.getenv("INFLUX_TOKEN_FILE") or find_token_file() or ""
 
 
 # ---- POINT SHAPE ----
