@@ -23,6 +23,7 @@ Typical usage on the Pi (token from file):
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import time
@@ -33,12 +34,23 @@ from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 
-# ---- SERIAL CONFIG (defaults match Dyno/dyno_simple.py) ----
-PORT = os.getenv(
-    "TELEM_PORT",
-    "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00",
-)
-BAUD = int(os.getenv("TELEM_BAUD", "115200"))
+# ---- SERIAL CONFIG (auto-detects RP2040 port) ----
+def find_serial_port():
+    """Auto-detect the RP2040 serial port"""
+    patterns = [
+        "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_*",
+        "/dev/serial/by-id/usb-Adafruit_Feather_RP2040_*",
+        "/dev/ttyACM*",
+    ]
+    
+    for pattern in patterns:
+        matches = sorted(glob.glob(pattern))
+        if matches:
+            return matches[0]
+    return "/dev/ttyACM0"  # fallback
+
+PORT = os.getenv("TELEM_PORT") or find_serial_port()
+BAUD = int(os.getenv("TELEM_BAUD", "921600"))  # Match dyno sketch baud rate
 
 
 # ---- INFLUX CONFIG ----
