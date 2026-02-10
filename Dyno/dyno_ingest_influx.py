@@ -54,9 +54,10 @@ BAUD = int(os.getenv("TELEM_BAUD", "921600"))  # Match dyno sketch baud rate
 
 
 # ---- INFLUX CONFIG ----
-INFLUX_URL = os.getenv("INFLUX_URL", "http://localhost:8086")
-INFLUX_ORG = os.getenv("INFLUX_ORG", "yorkracing")
-INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "telemetry")
+# Hardcoded defaults to avoid encoding issues
+INFLUX_URL = os.getenv("INFLUX_URL") or "http://localhost:8086"
+INFLUX_ORG = os.getenv("INFLUX_ORG") or "yorkracing"
+INFLUX_BUCKET = os.getenv("INFLUX_BUCKET") or "telemetry"
 
 # Auto-find token file if not specified
 def find_token_file():
