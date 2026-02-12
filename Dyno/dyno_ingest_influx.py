@@ -86,6 +86,7 @@ TAG_NODE = os.getenv("TELEM_NODE", "rp2040")
 
 # Fixed key list matching complete AN400 protocol (PE1-PE16)
 DEFAULT_KEYS = ",".join([
+    "imu_ok","ax_g","ay_g","az_g","gx_dps","gy_dps","gz_dps","imu_temp_c",
     "rpm","tps_pct","fot_ms","ign_deg",
     "baro_kpa","map_kpa","lambda","lambda2","lambda_target",
     "batt_v","coolant_c","air_c","oil_psi",

@@ -12,6 +12,9 @@
 
 #include <Arduino.h>
 #include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_LSM6DSOX.h>
+#include <Adafruit_Sensor.h>
 #include <Adafruit_MCP2515.h>
 
 // ---------- HARD FAIL if wrong board selected ----------
@@ -25,6 +28,16 @@ static constexpr uint32_t CAN_BITRATE   = 250000;
 static constexpr uint32_t JSON_PERIOD_MS = 50;   // 20 Hz
 static constexpr uint32_t STAT_PERIOD_MS = 1000; // 1 Hz
 static constexpr uint32_t BLINK_MS       = 500;  // LED heartbeat
+
+// ---------- IMU settings ----------
+static constexpr uint8_t  IMU_ADDR     = 0x6A; // LSM6DSOX default (SDO/SA0 low)
+static constexpr float    G0           = 9.80665f;
+static constexpr float    RAD2DEG      = 57.295779513f;
+static constexpr uint32_t IMU_CAL_MS   = 3000;
+static constexpr uint32_t IMU_CAL_SKIP_MS = 200;
+#ifndef IMU_CALIBRATE_AT_BOOT
+  #define IMU_CALIBRATE_AT_BOOT 1
+#endif
 
 // ---------- Board pins ----------
 static constexpr uint8_t CAN_CS    = PIN_CAN_CS;
@@ -45,6 +58,7 @@ static constexpr uint8_t LED_RED = PIN_LED;
 
 // ---------- CAN driver ----------
 Adafruit_MCP2515 CAN(CAN_CS);
+Adafruit_LSM6DSOX imu;
 
 // ===== Telemetry snapshot (latest values seen on CAN) =====
 static uint32_t g_pkt_counter     = 0;
@@ -68,6 +82,21 @@ static float    g_ws_fl_hz        = 0.0f;
 static float    g_ws_fr_hz        = 0.0f;
 static float    g_ws_bl_hz        = 0.0f;
 static float    g_ws_br_hz        = 0.0f;
+
+// IMU snapshot
+static bool     g_imu_ok          = false;
+static float    g_ax_g            = 0.0f;
+static float    g_ay_g            = 0.0f;
+static float    g_az_g            = 0.0f;
+static float    g_gx_dps          = 0.0f;
+static float    g_gy_dps          = 0.0f;
+static float    g_gz_dps          = 0.0f;
+static float    g_imu_temp_c      = 0.0f;
+
+// Gyro bias (deg/s)
+static float    g_gbx_dps         = 0.0f;
+static float    g_gby_dps         = 0.0f;
+static float    g_gbz_dps         = 0.0f;
 
 // Helpers: AN400 is little-endian [LowByte, HighByte]
 static inline uint16_t u16_lohi(uint8_t lo, uint8_t hi) {
@@ -150,6 +179,56 @@ void updateTelemetryFromFrame(uint32_t id, bool ext, uint8_t dlc, const uint8_t 
   }
 }
 
+void calibrateImuGyroBias() {
+  if (!g_imu_ok) return;
+
+  Serial.println("# IMU gyro bias calibration: keep sensor still...");
+  delay(IMU_CAL_SKIP_MS);
+
+  uint32_t t0 = millis();
+  uint32_t n = 0;
+  double sx = 0.0, sy = 0.0, sz = 0.0;
+
+  while (millis() - t0 < IMU_CAL_MS) {
+    sensors_event_t accel, gyro, temp;
+    imu.getEvent(&accel, &gyro, &temp);
+
+    sx += (gyro.gyro.x * RAD2DEG);
+    sy += (gyro.gyro.y * RAD2DEG);
+    sz += (gyro.gyro.z * RAD2DEG);
+    n++;
+
+    delay(5);
+  }
+
+  if (n == 0) n = 1;
+  g_gbx_dps = (float)(sx / n);
+  g_gby_dps = (float)(sy / n);
+  g_gbz_dps = (float)(sz / n);
+
+  Serial.print("# IMU gyro bias (deg/s): ");
+  Serial.print(g_gbx_dps, 5); Serial.print(", ");
+  Serial.print(g_gby_dps, 5); Serial.print(", ");
+  Serial.println(g_gbz_dps, 5);
+}
+
+void updateImuSnapshot() {
+  if (!g_imu_ok) return;
+
+  sensors_event_t accel, gyro, temp;
+  imu.getEvent(&accel, &gyro, &temp);
+
+  g_ax_g = accel.acceleration.x / G0;
+  g_ay_g = accel.acceleration.y / G0;
+  g_az_g = accel.acceleration.z / G0;
+
+  g_gx_dps = (gyro.gyro.x * RAD2DEG) - g_gbx_dps;
+  g_gy_dps = (gyro.gyro.y * RAD2DEG) - g_gby_dps;
+  g_gz_dps = (gyro.gyro.z * RAD2DEG) - g_gbz_dps;
+
+  g_imu_temp_c = temp.temperature;
+}
+
 // Emit one line of NDJSON telemetry representing the latest snapshot.
 void sendTelemetryJson() {
   if (!g_seen_any_can) return;
@@ -158,7 +237,7 @@ void sendTelemetryJson() {
   uint32_t ts = millis();
 
   String s;
-  s.reserve(320);
+  s.reserve(480);
 
   s += "{\"ts_ms\":";
   s += ts;
@@ -211,6 +290,26 @@ void sendTelemetryJson() {
   s += ",\"ws_br_hz\":";
   s += String(g_ws_br_hz, 1);
 
+  s += ",\"imu_ok\":";
+  s += (g_imu_ok ? 1 : 0);
+
+  s += ",\"ax_g\":";
+  s += String(g_ax_g, 5);
+  s += ",\"ay_g\":";
+  s += String(g_ay_g, 5);
+  s += ",\"az_g\":";
+  s += String(g_az_g, 5);
+
+  s += ",\"gx_dps\":";
+  s += String(g_gx_dps, 5);
+  s += ",\"gy_dps\":";
+  s += String(g_gy_dps, 5);
+  s += ",\"gz_dps\":";
+  s += String(g_gz_dps, 5);
+
+  s += ",\"imu_temp_c\":";
+  s += String(g_imu_temp_c, 2);
+
   s += "}";
   Serial.println(s);
 }
@@ -226,6 +325,24 @@ void setup() {
   Serial.println("# RP2040 CAN→USB bridge starting (PID 5724)");
   Serial.println("# Output: one JSON telemetry object per line (NDJSON), ~20 Hz");
   Serial.println("# Lines beginning with '#' are debug/status.");
+
+  // IMU setup (LSM6DSOX)
+  Wire.begin();
+  Wire.setClock(100000);
+  if (!imu.begin_I2C(IMU_ADDR, &Wire)) {
+    Serial.println("# WARN: LSM6DSOX not found. Continuing without IMU data.");
+    g_imu_ok = false;
+  } else {
+    imu.setAccelRange(LSM6DS_ACCEL_RANGE_4_G);
+    imu.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
+    imu.setAccelDataRate(LSM6DS_RATE_104_HZ);
+    imu.setGyroDataRate(LSM6DS_RATE_104_HZ);
+    g_imu_ok = true;
+    Serial.println("# IMU init OK (LSM6DSOX @ 0x6A)");
+#if IMU_CALIBRATE_AT_BOOT
+    calibrateImuGyroBias();
+#endif
+  }
 
   // Bring CAN transceiver out of standby + reset it
   pinMode(CAN_STBY, OUTPUT);
@@ -266,6 +383,9 @@ uint32_t frameCountThisSec = 0;
 
 void loop() {
   uint32_t now = millis();
+
+  // Keep latest IMU values fresh in snapshot
+  updateImuSnapshot();
 
   // Heartbeat LED
   if (now - lastBlink >= BLINK_MS) {
