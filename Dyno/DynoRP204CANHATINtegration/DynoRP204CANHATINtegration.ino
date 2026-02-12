@@ -1,6 +1,6 @@
-// CAN_to_Pi_USB_5724.ino
+// CAN_to_Pi_USB_RP2040RFM_CANWing.ino
 //
-// Adafruit Feather RP2040 CAN (PID 5724)
+// Feather RP2040 RFM (5714) + CAN Bus FeatherWing (5709)
 //   → Sniff AN400 CAN frames from the PE3 ECU (250 kbps, extended IDs)
 //   → Maintain a decoded telemetry snapshot
 //   → Emit one NDJSON telemetry object over USB serial at ~20 Hz.
@@ -17,52 +17,41 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_MCP2515.h>
 
-// ---------- HARD FAIL if wrong board selected ----------
-//#ifndef PIN_CAN_CS
-  //#error "Select Tools > Board: Adafruit Feather RP2040 CAN (so PIN_CAN_* matches the hardware)."
-//#endif
-
 // ---------- Settings ----------
-static constexpr uint32_t SERIAL_BAUD   = 921600;
-static constexpr uint32_t CAN_BITRATE   = 250000;
-static constexpr uint32_t JSON_PERIOD_MS = 50;   // 20 Hz
-static constexpr uint32_t STAT_PERIOD_MS = 1000; // 1 Hz
-static constexpr uint32_t BLINK_MS       = 500;  // LED heartbeat
+static constexpr uint32_t SERIAL_BAUD    = 921600;  // set Serial Monitor to this
+static constexpr uint32_t CAN_BITRATE    = 250000;
+static constexpr uint32_t JSON_PERIOD_MS = 50;      // 20 Hz
+static constexpr uint32_t STAT_PERIOD_MS = 1000;    // 1 Hz
+static constexpr uint32_t BLINK_MS       = 500;     // LED heartbeat
 
 // ---------- IMU settings ----------
-static constexpr uint8_t  IMU_ADDR     = 0x6A; // LSM6DSOX default (SDO/SA0 low)
-static constexpr float    G0           = 9.80665f;
-static constexpr float    RAD2DEG      = 57.295779513f;
-static constexpr uint32_t IMU_CAL_MS   = 3000;
+static constexpr uint8_t  IMU_ADDR        = 0x6A; // LSM6DSOX default (SDO/SA0 low)
+static constexpr float    G0              = 9.80665f;
+static constexpr float    RAD2DEG         = 57.295779513f;
+static constexpr uint32_t IMU_CAL_MS      = 3000;
 static constexpr uint32_t IMU_CAL_SKIP_MS = 200;
 #ifndef IMU_CALIBRATE_AT_BOOT
   #define IMU_CALIBRATE_AT_BOOT 1
 #endif
 
-// ---------- Board pins ----------
-static constexpr uint8_t CAN_CS    = PIN_CAN_CS;
-static constexpr uint8_t CAN_INT   = PIN_CAN_INTERRUPT;
-static constexpr uint8_t CAN_STBY  = PIN_CAN_STANDBY;
-static constexpr uint8_t CAN_RESET = PIN_CAN_RESET;
+// ---------- CAN FeatherWing pins (Adafruit CAN Bus FeatherWing 5709 defaults) ----------
+static constexpr uint8_t CAN_CS  = 5;  // Feather pin 5
+static constexpr uint8_t CAN_INT = 6;  // Feather pin 6
 
-static bool     g_seen_any_can = false;
-static uint32_t g_last_id = 0;
-static bool     g_last_ext = false;
-static uint8_t  g_last_dlc = 0;
-
-// Red LED on this Feather (D13)
+// LED
 #ifndef PIN_LED
   #define PIN_LED LED_BUILTIN
 #endif
 static constexpr uint8_t LED_RED = PIN_LED;
 
-// ---------- CAN driver ----------
+// ---------- CAN + IMU drivers ----------
 Adafruit_MCP2515 CAN(CAN_CS);
 Adafruit_LSM6DSOX imu;
 
 // ===== Telemetry snapshot (latest values seen on CAN) =====
 static uint32_t g_pkt_counter     = 0;
 static bool     g_seen_any_frame  = false;
+static bool     g_imu_ok          = false;
 
 static uint16_t g_rpm             = 0;
 static float    g_tps_pct         = 0.0f;
@@ -84,7 +73,6 @@ static float    g_ws_bl_hz        = 0.0f;
 static float    g_ws_br_hz        = 0.0f;
 
 // IMU snapshot
-static bool     g_imu_ok          = false;
 static float    g_ax_g            = 0.0f;
 static float    g_ay_g            = 0.0f;
 static float    g_az_g            = 0.0f;
@@ -146,13 +134,10 @@ void updateTelemetryFromFrame(uint32_t id, bool ext, uint8_t dlc, const uint8_t 
     g_lambda = lam_raw;
   }
   else if (id == ID_PE3) {
-    // Your project-specific mapping:
-    // Oil pressure encoded in bytes 2–3 with custom linear conversion.
     int16_t raw_op = s16_lohi(d[2], d[3]);
     g_oil_psi = (raw_op / 1000.0f) * 25.0f - 12.5f;
   }
   else if (id == ID_PE5) {
-    // Wheel speeds in Hz (0.2 Hz/bit)
     g_ws_fr_hz = s16_lohi(d[0], d[1]) * 0.2f;
     g_ws_fl_hz = s16_lohi(d[2], d[3]) * 0.2f;
     g_ws_br_hz = s16_lohi(d[4], d[5]) * 0.2f;
@@ -175,7 +160,7 @@ void updateTelemetryFromFrame(uint32_t id, bool ext, uint8_t dlc, const uint8_t 
     }
   }
   else if (id == ID_PE9) {
-    g_lambda = s16_lohi(d[0], d[1]) * 0.01f; // lambda #1 measured
+    g_lambda = s16_lohi(d[0], d[1]) * 0.01f;
   }
 }
 
@@ -197,7 +182,6 @@ void calibrateImuGyroBias() {
     sy += (gyro.gyro.y * RAD2DEG);
     sz += (gyro.gyro.z * RAD2DEG);
     n++;
-
     delay(5);
   }
 
@@ -231,7 +215,8 @@ void updateImuSnapshot() {
 
 // Emit one line of NDJSON telemetry representing the latest snapshot.
 void sendTelemetryJson() {
-  if (!g_seen_any_can) return;
+  // Only emit JSON once we have actually received CAN traffic
+  if (!g_seen_any_frame) return;
 
   g_pkt_counter++;
   uint32_t ts = millis();
@@ -314,17 +299,22 @@ void sendTelemetryJson() {
   Serial.println(s);
 }
 
-
 void setup() {
   pinMode(LED_RED, OUTPUT);
   digitalWrite(LED_RED, LOW);
 
   Serial.begin(SERIAL_BAUD);
-  delay(800);
+  while (!Serial) delay(10);
 
-  Serial.println("# RP2040 CAN→USB bridge starting (PID 5724)");
-  Serial.println("# Output: one JSON telemetry object per line (NDJSON), ~20 Hz");
-  Serial.println("# Lines beginning with '#' are debug/status.");
+  Serial.println("# RP2040 RFM + CAN FeatherWing starting");
+  Serial.println("# Output: NDJSON (~20 Hz) once CAN traffic is seen");
+
+  // Disable onboard LoRa radio (avoid SPI contention)
+#ifdef PIN_RFM_CS
+  pinMode(PIN_RFM_CS, OUTPUT);
+  digitalWrite(PIN_RFM_CS, HIGH);
+  Serial.println("# RFM CS forced HIGH (disabled)");
+#endif
 
   // IMU setup (LSM6DSOX)
   Wire.begin();
@@ -344,47 +334,30 @@ void setup() {
 #endif
   }
 
-  // Bring CAN transceiver out of standby + reset it
-  pinMode(CAN_STBY, OUTPUT);
-  digitalWrite(CAN_STBY, LOW);     // LOW = normal (not standby)
-
-  pinMode(CAN_RESET, OUTPUT);
-  digitalWrite(CAN_RESET, HIGH);
-  delay(5);
-  digitalWrite(CAN_RESET, LOW);
-  delay(5);
-  digitalWrite(CAN_RESET, HIGH);
-  delay(10);
-
   pinMode(CAN_INT, INPUT_PULLUP);
 
   if (!CAN.begin(CAN_BITRATE)) {
-    Serial.println("# ERROR: CAN init failed. Check board selection + library.");
+    Serial.println("# ERROR: CAN init failed.");
     while (1) {
       digitalWrite(LED_RED, !digitalRead(LED_RED));
-      delay(100);
+      delay(150);
     }
   }
 
   Serial.println("# CAN init OK @ 250k");
   Serial.print("# CAN pins: CS="); Serial.print(CAN_CS);
-  Serial.print(" INT=");          Serial.print(CAN_INT);
-  Serial.print(" STBY=");         Serial.print(CAN_STBY);
-  Serial.print(" RESET=");        Serial.println(CAN_RESET);
+  Serial.print(" INT=");          Serial.println(CAN_INT);
 }
 
 uint32_t lastBlink = 0;
 bool     ledState  = false;
 uint32_t lastStat  = 0;
 uint32_t lastJson  = 0;
-
-uint32_t lastFrameCount = 0;
 uint32_t frameCountThisSec = 0;
 
 void loop() {
   uint32_t now = millis();
 
-  // Keep latest IMU values fresh in snapshot
   updateImuSnapshot();
 
   // Heartbeat LED
@@ -394,18 +367,13 @@ void loop() {
     digitalWrite(LED_RED, ledState);
   }
 
-  // Read & decode CAN frames as they arrive
+  // Read & decode CAN frames
   int packetSize = CAN.parsePacket();
   if (packetSize > 0) {
     uint32_t id = CAN.packetId();
     bool ext = CAN.packetExtended();
     bool rtr = CAN.packetRtr();
     uint8_t dlc = (uint8_t)CAN.packetDlc();
-
-    g_seen_any_can = true;
-    g_last_id = id;
-    g_last_ext = ext;
-    g_last_dlc = dlc;
 
     uint8_t data[8] = {0};
     if (!rtr) {
@@ -420,16 +388,15 @@ void loop() {
     if (!rtr) updateTelemetryFromFrame(id, ext, dlc, data);
   }
 
+  // 1 Hz status so you can see if frames exist at all
+  if (now - lastStat >= STAT_PERIOD_MS) {
+    lastStat = now;
+    Serial.print("# STAT frames/s=");
+    Serial.println(frameCountThisSec);
+    frameCountThisSec = 0;
+  }
 
-  // Periodic status (optional, 1 Hz)
-  //if (now - lastStat >= STAT_PERIOD_MS) {
-    //lastStat = now;
-    //Serial.print("# STAT frames/s=");
-    //Serial.println(frameCountThisSec);
-   // frameCountThisSec = 0;
- // }
-
-  // Periodic NDJSON telemetry snapshot (~20 Hz)
+  // 20 Hz NDJSON once CAN traffic has been seen
   if (now - lastJson >= JSON_PERIOD_MS) {
     lastJson = now;
     sendTelemetryJson();
