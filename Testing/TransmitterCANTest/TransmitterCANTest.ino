@@ -1,6 +1,6 @@
 // TransmitterCANTest.ino
 //
-// Simulates PE3 (AN400) CAN frames on an Adafruit Feather RP2040 CAN board
+// Simulates PE3 Bosch MS4.3 telemetry on an Adafruit Feather RP2040 CAN board
 // and publishes the condensed telemetry snapshot over LoRa (RFM95/RH_RF95).
 // The packet layout mirrors the scaling used in Dyno/DynoRP204CANHATINtegration
 // so the receiver can sanity-check values without needing the full JSON output.
@@ -44,7 +44,7 @@ static constexpr uint8_t  LORA_PREAMBLE      = 0xAA;
 static constexpr uint8_t  LORA_VERSION       = 0x01;
 static constexpr uint8_t  LORA_PAYLOAD_BYTES = 34;
 static constexpr uint8_t  PACKET_BYTES       = 4 + LORA_PAYLOAD_BYTES;
-static constexpr uint32_t SEND_PERIOD_MS     = 200;   // 5 Hz snapshot
+static constexpr uint32_t SEND_PERIOD_MS     = 10;   // 100 Hz snapshot
 static constexpr uint32_t BLINK_MS           = 500;
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);

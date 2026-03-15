@@ -16,7 +16,7 @@
 //   1. Flash TransmitterCANTest onto one RP2040 Feather CAN board with RFM95.
 //   2. Flash this sketch on another board (or run sequentially).
 //   3. Open two Serial monitors at 115200 baud. You should see matching
-//      snapshots flowing every 200 ms along with RSSI information.
+//      snapshots flowing every 10 ms (~100 Hz) along with RSSI information.
 
 #include <Arduino.h>
 #include <SPI.h>

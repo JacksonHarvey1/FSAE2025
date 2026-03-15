@@ -1,0 +1,94 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_:
+
+
+BO_ 3221225472 VECTOR__INDEPENDENT_SIG_MSG: 0 Vector__XXX
+ SG_ Inj_Open_Tme m3 : 16|8@1+ (0.8192,0) [0|209] "ms" Vector__XXX
+
+BO_ 1904 PE3_770: 8 Vector__XXX
+ SG_ Row_770 M : 0|8@1+ (1,0) [0|9] "Row" Vector__XXX
+ SG_ Eng_Spd : 8|16@1+ (0.25,0) [0|16383] "RPM" Vector__XXX
+ SG_ TPS : 40|8@1+ (0.391,0) [0|100] "%" Vector__XXX
+ SG_ Ign_Angle : 48|8@1- (1.365,0) [-96|95] "DBTDC" Vector__XXX
+ SG_ CLT_Tmp m3 : 56|8@1+ (1,-40) [-40|215] "deg C" Vector__XXX
+ SG_ Oil_Tmp m4 : 56|8@1+ (1,-39) [-40|215] "deg C" Vector__XXX
+ SG_ IA_Tmp m6 : 56|8@1+ (1,-40) [-40|215] "deg C" Vector__XXX
+ SG_ Veh_Spd : 24|16@1+ (0.00781,0) [0|512] "Km/h" Vector__XXX
+ SG_ Gear m9 : 56|8@1+ (1,0) [0|255] "Gear" Vector__XXX
+
+BO_ 1905 PE3_771: 8 Vector__XXX
+ SG_ Row_771 M : 0|8@1+ (1,0) [0|4] "Row" Vector__XXX
+ SG_ MAP m0 : 40|16@1+ (0.1,0) [0|6553] "mbar" Vector__XXX
+ SG_ Fuel_P m3 : 40|8@1+ (0.0515,0) [0|13.1] "bar" Vector__XXX
+ SG_ Batt_V m1 : 56|8@1+ (0.111,0) [0|28.2] "Volt" Vector__XXX
+ SG_ Oil_P m3 : 56|8@1+ (0.0513,0) [0|13.1] "bar" Vector__XXX
+
+BO_ 1906 PE3_772: 8 Vector__XXX
+ SG_ Row_772 M : 0|8@1+ (1,0) [0|4] "Row" Vector__XXX
+ SG_ Lambda_1 m0 : 16|16@1+ (0.000244,0) [0|16] "Lambda" Vector__XXX
+ SG_ Lambda_2 m0 : 32|16@1+ (0.000244,0) [0|16] "Lambda" Vector__XXX
+
+BO_ 1936 PE3_790: 8 Vector__XXX
+ SG_ Extd_Eng_Spd : 0|16@1+ (1,0) [0|32750] "RPM" Vector__XXX
+ SG_ Extd_Ign_Angle : 32|16@1+ (0.1,0) [0|100] "DBTDC" Vector__XXX
+ SG_ Extd_MAP : 48|16@1+ (0.01,0) [0|320] "PSI" Vector__XXX
+
+
+
+CM_ SG_ 3221225472 Inj_Open_Tme "Injector open time";
+CM_ SG_ 1904 Row_770 "Row counter";
+CM_ SG_ 1904 Eng_Spd "Engine speed";
+CM_ SG_ 1904 TPS "Throttle position";
+CM_ SG_ 1904 Ign_Angle "Ignition timing in DBTDC crank angle";
+CM_ SG_ 1904 CLT_Tmp "Engine coolant temperature";
+CM_ SG_ 1904 Oil_Tmp "Engine oil temperature";
+CM_ SG_ 1904 IA_Tmp "Intake air charge temperature";
+CM_ SG_ 1904 Veh_Spd "Vehicle speed
+";
+CM_ SG_ 1904 Gear "Engaged gear";
+CM_ SG_ 1905 Row_771 "Row counter";
+CM_ SG_ 1905 MAP "Intake Manifold Absolute Pressure";
+CM_ SG_ 1905 Fuel_P "Fuel pressure";
+CM_ SG_ 1905 Batt_V "Battery supply voltage";
+CM_ SG_ 1905 Oil_P "Oil pressure";
+CM_ SG_ 1906 Row_772 "Row counter";
+CM_ SG_ 1906 Lambda_1 "Lambda 1 measurement";
+CM_ SG_ 1906 Lambda_2 "Lambda 2 measurement";
+CM_ SG_ 1936 Extd_Eng_Spd "Extended range engine speed (0-65k RPM)";
+CM_ SG_ 1936 Extd_Ign_Angle "Extended range ignition timing in DBTDC crank angle";
+CM_ SG_ 1936 Extd_MAP "Extended range intake Manifold Absolute Pressure";
+

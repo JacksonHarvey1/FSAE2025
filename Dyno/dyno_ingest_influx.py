@@ -84,28 +84,13 @@ MEASUREMENT = os.getenv("TELEM_MEASUREMENT", "telemetry")
 TAG_SYSTEM = os.getenv("TELEM_SYSTEM", "dyno")
 TAG_NODE = os.getenv("TELEM_NODE", "rp2040")
 
-# Fixed key list matching complete AN400 protocol (PE1-PE16)
+# Fixed key list matching the Bosch MS4.3 telemetry fields exposed by the RP2040 nodes
 DEFAULT_KEYS = ",".join([
     "imu_ok","ax_g","ay_g","az_g","gx_dps","gy_dps","gz_dps","imu_temp_c",
-    "rpm","tps_pct","fot_ms","ign_deg",
-    "baro_kpa","map_kpa","lambda","lambda2","lambda_target",
-    "batt_v","coolant_c","air_c","oil_psi",
-    "ws_fl_hz","ws_fr_hz","ws_bl_hz","ws_br_hz",
-    "ai1_v","ai2_v","ai3_v","ai4_v","ai5_v","ai6_v","ai7_v","ai8_v",
-    "therm5_temp","therm7_temp",
-    "rpm_rate_rps","tps_rate_pct_s","map_rate","maf_load_rate",
-    "pwm_duty_pct_1","pwm_duty_pct_2","pwm_duty_pct_3","pwm_duty_pct_4",
-    "pwm_duty_pct_5","pwm_duty_pct_6","pwm_duty_pct_7","pwm_duty_pct_8",
-    "percent_slip","driven_wheel_roc","traction_desired_pct",
-    "driven_avg_ws_ft_s","nondriven_avg_ws_ft_s",
-    "ign_comp_deg","ign_cut_pct",
-    "driven_ws1_ft_s","driven_ws2_ft_s",
-    "nondriven_ws1_ft_s","nondriven_ws2_ft_s",
-    "fuel_comp_accel_pct","fuel_comp_start_pct",
-    "fuel_comp_air_pct","fuel_comp_coolant_pct",
-    "fuel_comp_baro_pct","fuel_comp_map_pct",
-    "ign_comp_air_deg","ign_comp_coolant_deg",
-    "ign_comp_baro_deg","ign_comp_map_deg"
+    "rpm","veh_kph","tps_pct","ign_deg",
+    "map_kpa","map_ext_kpa","lambda","lambda2",
+    "batt_v","coolant_c","oil_temp_c","air_c","gear",
+    "fuel_bar","fuel_psi","oil_bar","oil_psi"
 ])
 KEYS = [k.strip() for k in os.getenv("TELEM_KEYS", DEFAULT_KEYS).split(",") if k.strip()]
 

@@ -21,9 +21,9 @@ The goal is to drop-in replace `DynoRP204CANHATINtegration` with this sketch so 
 | --- | --- |
 | MCU | Adafruit Feather RP2040 (UF2 bootloader) |
 | CAN Wing | Adafruit FeatherWing CAN (MCP2515 + TJA1051, product 5709) |
-| CAN speed | 250 kbps (matches PE3 AN400) |
+| CAN speed | 500 kbps (matches PE3 Bosch MS4.3 bus) |
 | Crystal | MCP2515 wing ships with 16 MHz crystal – do **not** swap |
-| Bus type | Extended IDs only (0x0CFFF0xx etc.) |
+| Bus type | Standard IDs (0x770/0x771/0x772/0x790 per Bosch DBC) |
 
 Make sure CANH/CANL go to the dyno harness (PE3 ECU) and the system shares ground.
 
@@ -59,7 +59,7 @@ These assignments come straight from the previous `Test1.ino` bring-up that we k
      ```
      # RP2040 + MCP2515 dyno bridge starting
      # Wiring summary ...
-     # MCP2515 init 250k/16MHz => OK
+     # MCP2515 init 500k/16MHz => OK
      # CANSTAT=0x0
      ```
    - JSON lines will appear once CAN traffic is detected. Lines starting with `#` or `DBG` are status and can be ignored by the Pi.
@@ -68,11 +68,11 @@ These assignments come straight from the previous `Test1.ino` bring-up that we k
 
 ## 5. Integration with the Pi ingest stack
 
-Nothing changes on the Raspberry Pi side:
+Nothing changes on the Raspberry Pi side beyond pulling this repo revision:
 
-- The NDJSON schema (`ts_ms`, `pkt`, `rpm`, `tps_pct`, etc.) is identical to the old firmware.
+- The NDJSON schema now reflects the Bosch MS4.3 channels (`rpm`, `veh_kph`, `map_kpa`, `fuel_bar`, `oil_bar`, etc.) but the ingest script already knows about the updated keys.
 - Serial parameters stay the same (115200 baud by default, bumpable if desired).
-- `Dyno/dyno_ingest_influx.py`, `Dyno/Dyno_Final.py`, and the Docker stack continue to work without edits.
+- `Dyno/dyno_ingest_influx.py`, `Dyno/Dyno_Final.py`, and the Docker stack continue to work without additional edits once this firmware is flashed.
 
 ---
 
@@ -80,9 +80,9 @@ Nothing changes on the Raspberry Pi side:
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| `# MCP2515 init 250k/16MHz => FAIL` | CS not actually on GP5, SPI pins swapped, or wing unpowered | Re-seat wing, check solder joints, ensure no other device pulls CS low |
-| `# STAT ... RX overflow` | CAN bus active but wing can’t drain buffers fast enough | Check that INT pin isn’t floating if you enabled interrupt mode; confirm 250 kbps wiring; make sure loop is not blocked |
-| JSON never prints | No CAN frames seen yet | Verify PE3 is powered and bus is 250 kbps extended; use `DBG RX ...` lines to confirm raw frames |
+| `# MCP2515 init 500k/16MHz => FAIL` | CS not actually on GP5, SPI pins swapped, or wing unpowered | Re-seat wing, check solder joints, ensure no other device pulls CS low |
+| `# STAT ... RX overflow` | CAN bus active but wing can’t drain buffers fast enough | Check that INT pin isn’t floating if you enabled interrupt mode; confirm 500 kbps wiring; make sure loop is not blocked |
+| JSON never prints | No CAN frames seen yet | Verify PE3 is powered and bus is 500 kbps on the Bosch IDs (0x770–0x790); use `DBG RX ...` lines to confirm raw frames |
 | Pi ingest misses packets | USB cable brown-out or serial baud mismatch | Keep 921600 on Pi if you crank up output rate; otherwise stay at 115200 |
 
 ---
@@ -90,8 +90,8 @@ Nothing changes on the Raspberry Pi side:
 ## 7. Future tweaks
 
 - If you later run a wire from the wing’s INT pad to an RP2040 GPIO, set `PIN_CAN_INT` in the sketch and flip `USE_CAN_INTERRUPT` to `1`. This lets the MCP2515 alert the MCU instead of being polled every loop.
-- For different CAN bitrates, adjust `CNF1/2/3` in `mcpInit250k_16MHz()`.
-- To log additional AN400 frames, extend `updateTelemetryFromFrame()` with new IDs just like the existing switch cases.
+- For different CAN bitrates, adjust `CNF1/2/3` in `mcpInit500k_16MHz()`.
+- To log additional Bosch PE3 frames, extend `updateTelemetryFromFrame()` with the IDs from the DBC just like the existing switch cases.
 
 ---
 
