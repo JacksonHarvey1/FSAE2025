@@ -12,7 +12,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 import os
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 
 def select_columns_dialog(columns, title_text="Select which columns to create graphs for:"):
     """
@@ -803,15 +803,25 @@ def main():
     
     # Get the script directory
     script_dir = Path(__file__).parent
-    
-    # Find all CSV files in the directory
-    csv_files = list(script_dir.glob("*.csv"))
-    
-    if not csv_files:
-        print("No CSV files found in the Data directory!")
+
+    # Show file picker dialog so user can select CSV files
+    print("Opening file selection dialog...")
+    root = tk.Tk()
+    root.withdraw()  # Hide the empty root window
+    root.attributes("-topmost", True)
+    selected_paths = filedialog.askopenfilenames(
+        title="Select CSV files to process",
+        initialdir=str(script_dir),
+        filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+    )
+    root.destroy()
+
+    if not selected_paths:
+        print("No files selected. Exiting.")
         return
-    
-    print(f"Found {len(csv_files)} CSV file(s) to process")
+
+    csv_files = [Path(p) for p in selected_paths]
+    print(f"Selected {len(csv_files)} CSV file(s) to process")
     
     # Read all CSV files to get complete column list
     print("\nScanning all CSV files for column names...")
