@@ -72,7 +72,8 @@ BAUD = int(os.getenv("TELEM_BAUD", "921600"))  # Match DynoRP204CANHATINtegratio
 # Use env var TELEM_KEYS to override with full field list when needed
 DEFAULT_KEYS = ",".join(
     [
-        "rpm","tps_pct","map_kpa","batt_v","coolant_c","air_c"
+        "rpm","tps_pct","map_kpa","batt_v","coolant_c","air_c",
+        "ign_deg","lambda1","fuel_psi","oil_psi","rssi"
     ]
 )
 KEYS = [k.strip() for k in os.getenv("TELEM_KEYS", DEFAULT_KEYS).split(",") if k.strip()]
@@ -422,6 +423,22 @@ app.layout = dbc.Container(
                 width=12,
             ),
         ),
+        dbc.Row(
+            dbc.Col(
+                dbc.Card(
+                    [
+                        dbc.CardHeader("Serial debug"),
+                        dbc.CardBody(html.Pre(id="debug-log", style={
+                            "maxHeight": "200px", "overflowY": "auto",
+                            "fontSize": "0.75rem", "color": "#adb5bd",
+                            "backgroundColor": "#0b0f25", "margin": 0,
+                        })),
+                    ],
+                    className="bg-dark mb-3",
+                ),
+                width=12,
+            )
+        ),
         dcc.Interval(id="update-interval", interval=APP_REFRESH_MS, n_intervals=0),
     ],
     fluid=True,
@@ -436,6 +453,7 @@ app.layout = dbc.Container(
     Output("raw-table", "columns"),
     Output("raw-table-container", "style"),
     Output("status-banner", "children"),
+    Output("debug-log", "children"),
     Input("update-interval", "n_intervals"),
     Input("metric-select", "value"),
     Input("graph-style", "value"),
@@ -453,8 +471,9 @@ def refresh_dashboard(_, selected_metrics, graph_style, raw_toggle):  # noqa: D4
     show_raw = raw_toggle and "raw" in raw_toggle
     table_style = {"display": "block"} if show_raw else {"display": "none"}
     banner = _build_status_banner(snapshot, status)
+    debug = _build_debug_log(status)
 
-    return legacy_fig, graphs, stats, table_data, table_columns, table_style, banner
+    return legacy_fig, graphs, stats, table_data, table_columns, table_style, banner, debug
 
 
 @app.callback(Output("metric-select", "value"), Input("reset-buffer", "n_clicks"))
@@ -662,6 +681,17 @@ def _build_status_banner(snapshot: TelemetrySnapshot, status: Dict[str, Any]) ->
             message += f" (last error: {last_error})"
 
     return dbc.Alert(message, color=color, className="mb-0")
+
+
+def _build_debug_log(status: Dict[str, Any]) -> str:
+    lines = [
+        f"port       : {status.get('port')}  baud={status.get('baud')}",
+        f"connected  : {status.get('connected')}  error={status.get('last_error') or 'none'}",
+        f"lines      : total={status.get('lines_total', 0)}  json={status.get('lines_json', 0)}  "
+        f"ignored={status.get('lines_ignored', 0)}  bad_json={status.get('lines_bad_json', 0)}",
+        f"last line  : {status.get('last_line') or '—'}",
+    ]
+    return "\n".join(lines)
 
 
 # -------------------- ENTRY POINT --------------------

@@ -166,6 +166,52 @@ bool readRx(uint8_t base, CanFrame &f) {
   return true;
 }
 
+// --------------------- Bosch decode (serial debug only) ---------------------
+static constexpr float BAR_TO_PSI = 14.503774f;
+static constexpr float PSI_TO_KPA = 6.894757f;
+
+static inline uint16_t u16_lohi(uint8_t lo, uint8_t hi) { return ((uint16_t)hi << 8) | lo; }
+
+void printDecoded(const CanFrame &f) {
+  if (f.ext) return;
+  if (f.id == 0x770 && f.dlc >= 7) {
+    Serial.print(F("  -> RPM=")); Serial.print(u16_lohi(f.d[1], f.d[2]) * 0.25f, 0);
+    Serial.print(F(" TPS=")); Serial.print(f.d[5] * 0.391f, 1); Serial.print('%');
+    Serial.print(F(" IGN=")); Serial.print((int8_t)f.d[6] * 1.365f, 1); Serial.print(F("deg"));
+    if (f.dlc >= 8) {
+      uint8_t row = f.d[0];
+      if (row == 3) { Serial.print(F(" Coolant=")); Serial.print(f.d[7] - 40); Serial.print('C'); }
+      if (row == 4) { Serial.print(F(" OilT="));    Serial.print(f.d[7] - 39); Serial.print('C'); }
+      if (row == 6) { Serial.print(F(" IAT="));     Serial.print(f.d[7] - 40); Serial.print('C'); }
+      if (row == 9) { Serial.print(F(" Gear="));    Serial.print(f.d[7]); }
+    }
+    Serial.println();
+  } else if (f.id == 0x771 && f.dlc >= 6) {
+    uint8_t row = f.d[0];
+    if (row == 0 && f.dlc >= 7) { Serial.print(F("  -> MAP=")); Serial.print(u16_lohi(f.d[5], f.d[6]) * 0.01f, 1); Serial.println(F(" kPa")); }
+    if (row == 1 && f.dlc >= 8) { Serial.print(F("  -> Batt=")); Serial.print(f.d[7] * 0.111f, 2); Serial.println('V'); }
+    if (row == 3 && f.dlc >= 8) {
+      Serial.print(F("  -> Fuel=")); Serial.print(f.d[5] * 0.0515f * BAR_TO_PSI, 1); Serial.print(F("psi"));
+      Serial.print(F(" Oil="));  Serial.print(f.d[7] * 0.0513f * BAR_TO_PSI, 1); Serial.println(F("psi"));
+    }
+  } else if (f.id == 0x772 && f.dlc >= 3) {
+    uint8_t row = f.d[0];
+    if (row == 0 && f.dlc >= 6) {
+      Serial.print(F("  -> L1=")); Serial.print(u16_lohi(f.d[2], f.d[3]) * 0.000244f, 3);
+      Serial.print(F(" L2=")); Serial.println(u16_lohi(f.d[4], f.d[5]) * 0.000244f, 3);
+    } else if (row == 3) {
+      Serial.print(F("  -> InjTime=")); Serial.print(f.d[2] * 0.8192f, 2); Serial.println(F(" ms"));
+    } else {
+      Serial.print(F("  -> 0x772 row=")); Serial.print(row); Serial.println(F(" (no signals defined in DBC)"));
+    }
+  } else if (f.id == 0x790) {
+    if (f.dlc >= 2) { Serial.print(F("  -> RPM=")); Serial.print(u16_lohi(f.d[0], f.d[1])); }
+    if (f.dlc >= 6) { Serial.print(F(" IGN=")); Serial.print(u16_lohi(f.d[4], f.d[5]) * 0.1f, 1); Serial.print(F("deg")); }
+    if (f.dlc >= 8) { Serial.print(F(" MAP=")); Serial.print(u16_lohi(f.d[6], f.d[7]) * 0.01f * PSI_TO_KPA, 1); Serial.print(F("kPa")); }
+    Serial.println();
+  }
+}
+
 // --------------------- Binary LoRa send ---------------------
 static uint32_t g_seq = 0;
 
@@ -204,7 +250,8 @@ bool sendFrameBinary(const CanFrame &f) {
 }
 
 // --------------------- Setup/Loop ---------------------
-uint32_t lastBlink = 0;
+uint32_t lastBlink  = 0;
+uint32_t lastStatus = 0;
 bool ledState = false;
 
 void setup() {
@@ -267,6 +314,25 @@ void loop() {
     digitalWrite(LED_RED, ledState);
   }
 
+  // Periodic status: CANSTAT, EFLG, CANINTF, seq count — every 2 seconds
+  if (now - lastStatus >= 2000) {
+    lastStatus = now;
+    uint8_t canstat = mcpRead(CANSTAT);
+    uint8_t eflg    = mcpRead(0x2D);  // EFLG
+    uint8_t intf_s  = mcpRead(CANINTF);
+    Serial.print(F("[TX] uptime=")); Serial.print(now / 1000);
+    Serial.print(F("s  seq=")); Serial.print(g_seq);
+    Serial.print(F("  CANSTAT=0x")); Serial.print(canstat, HEX);
+    Serial.print(F("  EFLG=0x")); Serial.print(eflg, HEX);
+    if (eflg & 0x20) Serial.print(F(" TXBO"));
+    if (eflg & 0x10) Serial.print(F(" TXEP"));
+    if (eflg & 0x08) Serial.print(F(" RXEP"));
+    if (eflg & 0x40) Serial.print(F(" RX0OVF"));
+    if (eflg & 0x80) Serial.print(F(" RX1OVF"));
+    if (eflg == 0)   Serial.print(F(" OK"));
+    Serial.print(F("  INTF=0x")); Serial.println(intf_s, HEX);
+  }
+
   // Poll RX flags
   uint8_t intf = mcpRead(CANINTF);
   CanFrame f;
@@ -274,11 +340,29 @@ void loop() {
   if (intf & RX0IF) {
     readRx(RXB0SIDH, f);
     mcpBitMod(CANINTF, RX0IF, 0x00); // clear
+    Serial.print(F("[TX] RX0 ID=0x")); Serial.print(f.id, HEX);
+    Serial.print(F(" DLC=")); Serial.print(f.dlc);
+    Serial.print(F(" DATA="));
+    for (uint8_t i = 0; i < f.dlc && i < 8; i++) {
+      if (f.d[i] < 16) Serial.print('0');
+      Serial.print(f.d[i], HEX); Serial.print(' ');
+    }
+    Serial.println();
+    printDecoded(f);
     sendFrameBinary(f);
   }
   if (intf & RX1IF) {
     readRx(RXB1SIDH, f);
     mcpBitMod(CANINTF, RX1IF, 0x00); // clear
+    Serial.print(F("[TX] RX1 ID=0x")); Serial.print(f.id, HEX);
+    Serial.print(F(" DLC=")); Serial.print(f.dlc);
+    Serial.print(F(" DATA="));
+    for (uint8_t i = 0; i < f.dlc && i < 8; i++) {
+      if (f.d[i] < 16) Serial.print('0');
+      Serial.print(f.d[i], HEX); Serial.print(' ');
+    }
+    Serial.println();
+    printDecoded(f);
     sendFrameBinary(f);
   }
 }
