@@ -113,14 +113,15 @@ bool mcpSetMode(uint8_t mode) {
   return ((mcpRead(CANSTAT) & MODE_MASK) == mode);
 }
 
-// 250 kbps @ 16 MHz (your known-good CNF values)
-bool mcpInit250k_16MHz() {
+// 500 kbps @ 16 MHz — matches Bosch MS4.3 (PE3 8400) ECU
+// BRP1 preset: CNF1=0x01, CNF2=0x90, CNF3=0x02 (sample ~70%)
+bool mcpInit500k_16MHz() {
   mcpReset();
   if (!mcpSetMode(MODE_CONFIG)) return false;
 
-  mcpWrite(CNF1, 0x41);
-  mcpWrite(CNF2, 0xF1);
-  mcpWrite(CNF3, 0x85);
+  mcpWrite(CNF1, 0x01);
+  mcpWrite(CNF2, 0x90);
+  mcpWrite(CNF3, 0x02);
 
   // Receive any
   mcpWrite(RXB0CTRL, 0x60);
@@ -246,9 +247,9 @@ void setup() {
   rf95.setTxPower(LORA_TX_POWER_DBM, false);
   Serial.print("LoRa OK @ "); Serial.print(LORA_FREQ_MHZ); Serial.println(" MHz");
 
-  // Init MCP2515
-  bool canOk = mcpInit250k_16MHz();
-  Serial.print("MCP2515 init: "); Serial.println(canOk ? "OK" : "FAIL");
+  // Init MCP2515 @ 500 kbps (Bosch MS4.3 / PE3 8400)
+  bool canOk = mcpInit500k_16MHz();
+  Serial.print("MCP2515 init @500kbps: "); Serial.println(canOk ? "OK" : "FAIL");
   if (!canOk) {
     Serial.println("Check CAN wiring/CS/termination/16MHz crystal.");
     while (1) { digitalWrite(LED_RED, !digitalRead(LED_RED)); delay(200); }
