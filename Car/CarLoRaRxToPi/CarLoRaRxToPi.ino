@@ -75,6 +75,10 @@ static inline int16_t s16_lohi(uint8_t lo, uint8_t hi) {
   return (n > 32767) ? (int16_t)(n - 65536) : (int16_t)n;
 }
 
+static inline int16_t get_s16_le(const uint8_t *p) {
+  return s16_lohi(p[0], p[1]);
+}
+
 // --------------------- Bosch decode ---------------------
 void updateSnapshot(uint32_t id, bool ext, uint8_t dlc, const uint8_t *d) {
   if (ext) return; // Bosch uses standard 11-bit IDs only
@@ -218,18 +222,42 @@ void loop() {
     uint8_t len = sizeof(buf);
     if (!rf95.recv(buf, &len)) break;
 
-    if (len != 24 || buf[0] != 0xA5 || buf[1] != 0x01) continue; // bad packet
+    if (len < 10 || buf[0] != 0xA5) continue; // bad magic
 
-    uint8_t  flags = buf[2];
-    bool     ext   = (flags & 0x01) != 0;
-    uint8_t  dlc   = buf[3] & 0x0F;
-    uint32_t id    = get_u32_le(&buf[4]);
+    if (buf[1] == 0x01 && len == 24) {
+      // CAN frame packet
+      uint8_t  flags = buf[2];
+      bool     ext   = (flags & 0x01) != 0;
+      uint8_t  dlc   = buf[3] & 0x0F;
+      uint32_t id    = get_u32_le(&buf[4]);
 
-    g_pkt = get_u32_le(&buf[20]);
-    g_snap.rssi = rf95.lastRssi();
-    pktCount++;
+      g_pkt = get_u32_le(&buf[20]);
+      g_snap.rssi = rf95.lastRssi();
+      pktCount++;
 
-    updateSnapshot(id, ext, dlc, &buf[12]);
+      updateSnapshot(id, ext, dlc, &buf[12]);
+
+    } else if (buf[1] == 0x02 && len == 22) {
+      // IMU packet — emit JSON immediately (separate line from Bosch)
+      uint32_t seq   = get_u32_le(&buf[2]);
+      float ax = get_s16_le(&buf[10]) / 1000.0f;
+      float ay = get_s16_le(&buf[12]) / 1000.0f;
+      float az = get_s16_le(&buf[14]) / 1000.0f;
+      float gx = get_s16_le(&buf[16]) / 10.0f;
+      float gy = get_s16_le(&buf[18]) / 10.0f;
+      float gz = get_s16_le(&buf[20]) / 10.0f;
+      pktCount++;
+
+      Serial.print(F("{\"t\":\"imu\",\"pkt\":"));  Serial.print(seq);
+      Serial.print(F(",\"ax_g\":"));    Serial.print(ax, 3);
+      Serial.print(F(",\"ay_g\":"));    Serial.print(ay, 3);
+      Serial.print(F(",\"az_g\":"));    Serial.print(az, 3);
+      Serial.print(F(",\"gx_dps\":")); Serial.print(gx, 2);
+      Serial.print(F(",\"gy_dps\":")); Serial.print(gy, 2);
+      Serial.print(F(",\"gz_dps\":")); Serial.print(gz, 2);
+      Serial.print(F(",\"rssi\":"));   Serial.print(rf95.lastRssi());
+      Serial.println(F("}"));
+    }
   }
 
   // Emit JSON at fixed rate (10 Hz)

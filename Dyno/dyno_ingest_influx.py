@@ -86,10 +86,15 @@ TAG_NODE = os.getenv("TELEM_NODE", "rp2040")
 
 # Fields emitted by CarLoRaRxToPi (Bosch MS4.3 via LoRa)
 DEFAULT_KEYS = ",".join([
+    # Bosch ECU channels
     "rpm","veh_kph","tps_pct","ign_deg",
     "map_kpa","map_ext_kpa","lambda1","lambda2",
     "batt_v","coolant_c","oil_temp_c","air_c","gear",
-    "fuel_psi","oil_psi","inj_ms","rssi"
+    "fuel_psi","oil_psi","inj_ms",
+    # IMU (LSM6DSOX) channels
+    "ax_g","ay_g","az_g","gx_dps","gy_dps","gz_dps",
+    # Link quality
+    "rssi",
 ])
 KEYS = [k.strip() for k in os.getenv("TELEM_KEYS", DEFAULT_KEYS).split(",") if k.strip()]
 
