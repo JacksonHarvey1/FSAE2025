@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <SD.h>
+#include <SdFat.h>
 #include <RH_RF95.h>
 #include <Adafruit_LSM6DSOX.h>
 #include <Adafruit_Sensor.h>
@@ -57,26 +57,32 @@ static const uint16_t GEAR_DAC[6] = {
 };
 
 // =====================================================================
-//  GEAR RATIO DETECTION
+//  GEAR RATIO DETECTION — band + hysteresis
 // =====================================================================
-// Ratio = RPM / veh_kph at steady speed in each gear.
-//
-// HOW TO CALIBRATE:
-//   Drive in each gear at steady RPM + speed.
-//   Set GEAR_RATIOS[n-1] = measured_RPM / measured_KPH.
-//   Example: 4000 RPM @ 36 kph in 1st → ratio = 111.1
-//
-// These defaults are estimates for a CBR600-based FSAE car.
-// MUST be updated for your specific drivetrain.
-static constexpr float GEAR_RATIOS[5] = {
-  210.0f,  // 1st gear  (RPM per km/h)
-  150.0f,  // 2nd gear
-  110.0f,  // 3rd gear
-   85.0f,  // 4th gear
-   65.0f,  // 5th gear
+// Derived from RPM vs Speed graph (12T/42T drive, 2026 proposed).
+// Each gear line was read at ~14,000 RPM:
+//   1st: 33 mph  2nd: 45 mph  3rd: 54 mph  4th: 62 mph  5th: 68 mph
+// Slopes in RPM/mph divided by 1.609 to get RPM/kph:
+//   1st≈264  2nd≈193  3rd≈161  4th≈140  5th≈128
+// Band boundaries are midpoints between adjacent gear slopes.
+// Hysteresis: enterMin/enterMax is tight, stayMin/stayMax is ~8% wider.
+// Units: RPM / kph
+struct GearBand {
+  float enterMin;
+  float enterMax;
+  float stayMin;
+  float stayMax;
 };
-static constexpr float VEH_MOVING_KPH = 5.0f;    // below this = Neutral
+static constexpr GearBand GEAR_BANDS[5] = {
+  {228, 9999, 215, 9999},  // 1st  (ratio > 228 to enter)
+  {177, 228,  165, 242 },  // 2nd
+  {150, 177,  140, 185 },  // 3rd
+  {134, 150,  126, 158 },  // 4th
+  {  0, 134,    0, 142 },  // 5th
+};
+static constexpr float VEH_MOVING_KPH  = 3.0f;    // below ~2 mph = Neutral
 static constexpr float RPM_MIN         = 500.0f;  // below this = Neutral
+static constexpr uint8_t GEAR_CONFIRM  = 4;        // samples before switching
 
 // =====================================================================
 //  IMU (LSM6DSOX via I2C, address 0x6A)
@@ -211,7 +217,8 @@ uint8_t g_gear    = 0;  // 0=neutral, 1-5=gear
 
 // SD state
 bool     g_sdOk      = false;
-File     g_logFile;
+SdFat    sd;
+SdFile   g_logFile;
 char     g_logBuf[LOG_BUF_SIZE];
 size_t   g_logPos    = 0;
 uint32_t lastSdFlush = 0;
@@ -220,9 +227,11 @@ uint32_t lastSdFlush = 0;
 uint32_t g_seq = 0;
 
 // LED + status timing
-uint32_t lastBlink  = 0;
-uint32_t lastStatus = 0;
-bool     ledState   = false;
+uint32_t lastBlink    = 0;
+uint32_t lastStatus   = 0;
+uint32_t lastCanFrame = 0;  // for CAN timeout → neutral
+uint32_t lastGearCalc = 0;  // periodic gear recalc
+bool     ledState     = false;
 
 // =====================================================================
 //  HELPERS
@@ -241,32 +250,67 @@ static inline void put_i16_le(uint8_t *p, int16_t v) {
 // =====================================================================
 //  MCP4725 DAC
 // =====================================================================
-// Fast-write: 2 bytes — [upper 4 bits | 0x0?, lower 8 bits]
+// Fast-write: 2 bytes — sets DAC output immediately
 void dacWrite(uint16_t val12) {
   val12 &= 0x0FFF;
   Wire.beginTransmission(DAC_ADDR);
-  Wire.write((uint8_t)(val12 >> 8));   // bits [11:8]
-  Wire.write((uint8_t)(val12 & 0xFF)); // bits [7:0]
-  Wire.endTransmission();
+  Wire.write((uint8_t)(val12 >> 8));
+  Wire.write((uint8_t)(val12 & 0xFF));
+  uint8_t err = Wire.endTransmission();
+  Serial.print(F("[DAC] val=")); Serial.print(val12);
+  Serial.print(F(" V=")); Serial.print(val12 * 5.0f / 4095.0f, 3);
+  Serial.print(F("  I2C err=")); Serial.println(err);  // 0=OK, 2=NACK
 }
 
 // =====================================================================
 //  GEAR DETECTION
 // =====================================================================
 // Returns 0 (neutral) or 1-5 (gear number).
+// Persistent state for hysteresis + debounce
+static uint8_t s_currentGear   = 0;
+static uint8_t s_candidateGear = 0;
+static uint8_t s_confirmCount  = 0;
+
 uint8_t calculateGear(float rpm, float kph) {
-  if (rpm < RPM_MIN || kph < VEH_MOVING_KPH) return 0; // Neutral
+  // Simple neutral: engine not running or not moving
+  if (rpm <= 0.0f || rpm < RPM_MIN || kph < VEH_MOVING_KPH) {
+    s_currentGear = 0; s_candidateGear = 0; s_confirmCount = 0;
+    return 0;
+  }
 
   float ratio = rpm / kph;
 
-  // Find closest gear ratio using nearest-neighbour
-  uint8_t best = 0;
-  float bestDiff = fabsf(ratio - GEAR_RATIOS[0]);
-  for (uint8_t i = 1; i < 5; i++) {
-    float diff = fabsf(ratio - GEAR_RATIOS[i]);
-    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  // 1. Try to stay in current gear (hysteresis stayMin/stayMax)
+  if (s_currentGear >= 1 && s_currentGear <= 5) {
+    const GearBand &b = GEAR_BANDS[s_currentGear - 1];
+    if (ratio >= b.stayMin && ratio <= b.stayMax) {
+      s_candidateGear = s_currentGear;
+      s_confirmCount  = GEAR_CONFIRM;
+      return s_currentGear;
+    }
   }
-  return best + 1;  // 1-indexed
+
+  // 2. Find which enter band the ratio falls in
+  uint8_t candidate = 0;
+  for (uint8_t i = 0; i < 5; i++) {
+    if (ratio >= GEAR_BANDS[i].enterMin && ratio <= GEAR_BANDS[i].enterMax) {
+      candidate = i + 1;
+      break;
+    }
+  }
+
+  // 3. Debounce — require GEAR_CONFIRM consistent readings before switching
+  if (candidate == s_candidateGear) {
+    if (s_confirmCount < GEAR_CONFIRM) s_confirmCount++;
+  } else {
+    s_candidateGear = candidate;
+    s_confirmCount  = 1;
+  }
+
+  if (s_confirmCount >= GEAR_CONFIRM) {
+    s_currentGear = s_candidateGear;
+  }
+  return s_currentGear;
 }
 
 // =====================================================================
@@ -378,9 +422,13 @@ void sendImuBinary(float ax, float ay, float az,
 void sdInit() {
   pinMode(SD_CS, OUTPUT);
   digitalWrite(SD_CS, HIGH);
+  delay(250);  // SD power-up settling time
 
-  if (!SD.begin(SD_CS)) {
-    Serial.println(F("SD: init failed — no card or wiring issue"));
+  if (!sd.begin(SdSpiConfig(SD_CS, SHARED_SPI, SD_SCK_MHZ(1)))) {
+    Serial.print(F("SD: init failed — error code: 0x"));
+    Serial.print(sd.sdErrorCode(), HEX);
+    Serial.print(F("  data: 0x"));
+    Serial.println(sd.sdErrorData(), HEX);
     g_sdOk = false;
     return;
   }
@@ -388,14 +436,14 @@ void sdInit() {
   // Find next available log file: LOG_0001.CSV, LOG_0002.CSV ...
   char fname[16];
   for (uint16_t n = 1; n <= 9999; n++) {
-    snprintf(fname, sizeof(fname), "/LOG_%04u.CSV", n);
-    if (!SD.exists(fname)) {
-      g_logFile = SD.open(fname, FILE_WRITE);
+    snprintf(fname, sizeof(fname), "LOG_%04u.CSV", n);
+    if (!sd.exists(fname)) {
+      g_logFile.open(fname, O_WRONLY | O_CREAT);
       break;
     }
   }
 
-  if (!g_logFile) {
+  if (!g_logFile.isOpen()) {
     Serial.println(F("SD: could not open log file"));
     g_sdOk = false;
     return;
@@ -404,7 +452,7 @@ void sdInit() {
   // Write CSV header
   g_logFile.println(F("ts_ms,rpm,veh_kph,gear,tps_pct,map_kpa,"
                        "ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps"));
-  g_logFile.flush();
+  g_logFile.sync();
   g_sdOk = true;
   Serial.print(F("SD: logging to ")); Serial.println(fname);
 }
@@ -426,7 +474,7 @@ void sdLog(uint32_t ts) {
 
   // If buffer would overflow, flush first
   if (g_logPos + (size_t)len >= LOG_BUF_SIZE) {
-    g_logFile.write((uint8_t*)g_logBuf, g_logPos);
+    g_logFile.write(g_logBuf, g_logPos);
     g_logPos = 0;
   }
   memcpy(g_logBuf + g_logPos, row, len);
@@ -436,10 +484,10 @@ void sdLog(uint32_t ts) {
 void sdFlush() {
   if (!g_sdOk) return;
   if (g_logPos > 0) {
-    g_logFile.write((uint8_t*)g_logBuf, g_logPos);
+    g_logFile.write(g_logBuf, g_logPos);
     g_logPos = 0;
   }
-  g_logFile.flush();
+  g_logFile.sync();
 }
 
 // =====================================================================
@@ -467,6 +515,9 @@ void setup() {
   digitalWrite(RFM95_RST, HIGH); delay(10);
 
   Serial.println(F("=== CAN->LoRa TX (binary) | Gear DAC | SD Logger ==="));
+
+  // SD card MUST be initialized first on a shared SPI bus
+  sdInit();
 
   // LoRa init
   if (!rf95.init()) {
@@ -519,13 +570,11 @@ void setup() {
     Serial.println(F("IMU: LSM6DSOX not found at 0x6A"));
   }
 
-  // DAC init — output 0 V (neutral)
+  // DAC init — output neutral voltage
   dacWrite(GEAR_DAC[0]);
   Serial.println(F("MCP4725 DAC: initialized (Neutral voltage)"));
 
-  // SD card init
-  sdInit();
-
+  lastCanFrame = millis();  // don't trigger CAN timeout immediately
   Serial.println(F("TX running."));
 }
 
@@ -546,11 +595,12 @@ void loop() {
   if (now - lastStatus >= 5000) {
     lastStatus = now;
     uint8_t eflg = mcpRead(0x2D);
-    Serial.print(F("[TX] uptime=")); Serial.print(now/1000);
+    Serial.print(F("[STATUS] uptime=")); Serial.print(now/1000);
     Serial.print(F("s seq=")); Serial.print(g_seq);
     Serial.print(F(" gear=")); Serial.print(g_gear);
     Serial.print(F(" rpm=")); Serial.print(g_rpm,0);
     Serial.print(F(" kph=")); Serial.print(g_veh_kph,1);
+    Serial.print(F(" ratio=")); Serial.print(g_veh_kph > 1.0f ? g_rpm/g_veh_kph : 0, 1);
     Serial.print(F(" EFLG=0x")); Serial.print(eflg, HEX);
     if (eflg==0) Serial.print(F(" OK"));
     Serial.println();
@@ -585,6 +635,27 @@ void loop() {
     sdFlush();
   }
 
+  // CAN timeout — if no frames for >500ms, zero stale RPM/kph
+  if ((now - lastCanFrame) > 500UL) {
+    g_rpm = 0; g_veh_kph = 0;
+  }
+
+  // Gear recalc every 100ms — doesn't depend on CAN frames arriving
+  if (now - lastGearCalc >= 100UL) {
+    lastGearCalc = now;
+    uint8_t newGear = calculateGear(g_rpm, g_veh_kph);
+    // Debug: always print so we can see what's happening
+    Serial.print(F("[GCALC] rpm=")); Serial.print(g_rpm, 1);
+    Serial.print(F(" kph=")); Serial.print(g_veh_kph, 2);
+    Serial.print(F(" ratio="));
+    Serial.print(g_veh_kph > 0.01f ? g_rpm / g_veh_kph : 0.0f, 1);
+    Serial.print(F(" -> gear=")); Serial.println(newGear);
+    if (newGear != g_gear) {
+      g_gear = newGear;
+      dacWrite(GEAR_DAC[g_gear]);
+    }
+  }
+
   // Poll CAN RX flags
   uint8_t intf = mcpRead(CANINTF);
   CanFrame f;
@@ -592,6 +663,7 @@ void loop() {
   auto handleFrame = [&](uint8_t base, const char *label, uint8_t clearBit) {
     readRx(base, f);
     mcpBitMod(CANINTF, clearBit, 0x00);
+    lastCanFrame = now;
 
     Serial.print(F("[TX] ")); Serial.print(label);
     Serial.print(F(" ID=0x")); Serial.print(f.id, HEX);
@@ -604,16 +676,8 @@ void loop() {
     Serial.println();
     printDecoded(f);
 
-    // Update TX snapshot + gear
+    // Update TX snapshot (gear recalc runs on 100ms timer above)
     updateTxSnapshot(f);
-    uint8_t newGear = calculateGear(g_rpm, g_veh_kph);
-    if (newGear != g_gear) {
-      g_gear = newGear;
-      dacWrite(GEAR_DAC[g_gear]);
-      Serial.print(F("[GEAR] -> ")); Serial.print(g_gear == 0 ? F("Neutral") : (String("Gear ")+g_gear).c_str());
-      Serial.print(F("  DAC=")); Serial.println(GEAR_DAC[g_gear]);
-    }
-
     sendFrameBinary(f);
   };
 

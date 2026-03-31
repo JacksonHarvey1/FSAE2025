@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pdftotext \"c:\\\\Github\\\\FSAE2025\\\\Reference Documents\\\\adafruit-microsd-spi-sdio.pdf\" /dev/stdout)",
+      "Bash(pdftotext 'c:\\\\Github\\\\FSAE2025\\\\Reference Documents\\\\adafruit-microsd-spi-sdio.pdf' -)",
+      "Bash(pdftotext \"c:/Github/FSAE2025/Reference Documents/adafruit-microsd-spi-sdio.pdf\" /dev/stdout)"
+    ]
+  }
+}
