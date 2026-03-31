@@ -1,37 +1,81 @@
-#include <SPI.h>
-#include <SD.h>
+// SD Card Test — Feather RP2040 RFM95
+// Uses SdFat (same library as CarCanLoRaTx) to verify wiring and card format.
+// Expected result in Serial Monitor (115200 baud):
+//   SD init OK
+//   File written: TEST0001.TXT
+//   File read back OK: "SD test OK - <timestamp>ms"
+//
+// If it prints FAIL, check:
+//   1. Card is FAT32 (use SD Card Formatter, not Windows format)
+//   2. SPI wiring: MISO=8, MOSI=15, SCK=14, CS=A2(pin28)
+//   3. SdFat library installed (Tools > Manage Libraries > "SdFat" by Bill Greiman)
 
-#define SD_CS 28
+#include <SPI.h>
+#include <SdFat.h>
+
+#define SD_CS 25  // D25 (GP25) on Feather RP2040
+
+SdFat sd;
 
 void setup() {
   Serial.begin(115200);
-  delay(600);
-
-  // CS toggle test — put a multimeter on A2 and watch it blink
-  pinMode(SD_CS, OUTPUT);
-  for (int i = 0; i < 5; i++) {
-    digitalWrite(SD_CS, LOW);  delay(200);
-    digitalWrite(SD_CS, HIGH); delay(200);
-  }
-  Serial.println("CS toggle done — did A2 move on multimeter?");
+  delay(1000);
+  Serial.println("=== SD Card Test (SdFat) ===");
 
   SPI.setRX(8);
   SPI.setTX(15);
   SPI.setSCK(14);
   SPI.begin();
-  delay(200);
 
-  Serial.println("Testing SD...");
-  if (!SD.begin(SD_CS, SPI)) {
-    Serial.println("FAIL - check wiring and FAT32 format");
+  pinMode(SD_CS, OUTPUT);
+  digitalWrite(SD_CS, HIGH);
+  delay(250);  // SD power-up settling
+
+  if (!sd.begin(SdSpiConfig(SD_CS, SHARED_SPI, SD_SCK_MHZ(1)))) {
+    Serial.print("FAIL - SD init error code: 0x");
+    Serial.print(sd.sdErrorCode(), HEX);
+    Serial.print("  data: 0x");
+    Serial.println(sd.sdErrorData(), HEX);
+    Serial.println("Check: FAT32 format, wiring, card seated properly.");
     return;
   }
+  Serial.println("SD init OK");
 
-  File f = SD.open("/TEST.TXT", FILE_WRITE);
-  if (!f) { Serial.println("FAIL - could not open file"); return; }
-  f.println("SD works!");
+  // Write test file
+  SdFile f;
+  if (!f.open("TEST0001.TXT", O_WRONLY | O_CREAT | O_TRUNC)) {
+    Serial.println("FAIL - could not create TEST0001.TXT");
+    return;
+  }
+  char msg[48];
+  snprintf(msg, sizeof(msg), "SD test OK - %lums\n", (unsigned long)millis());
+  f.write(msg, strlen(msg));
+  f.sync();
   f.close();
-  Serial.println("OK - TEST.TXT written");
+  Serial.println("File written: TEST0001.TXT");
+
+  // Read it back to verify
+  if (!f.open("TEST0001.TXT", O_RDONLY)) {
+    Serial.println("FAIL - could not re-open TEST0001.TXT for read");
+    return;
+  }
+  char buf[64] = {0};
+  int n = f.read(buf, sizeof(buf) - 1);
+  f.close();
+
+  if (n > 0) {
+    Serial.print("File read back OK: ");
+    Serial.print(buf);
+  } else {
+    Serial.println("FAIL - read returned no data");
+  }
+
+  // Print card info
+  uint32_t sizeMB = sd.card()->sectorCount() / 2048;
+  Serial.print("Card size: ");
+  Serial.print(sizeMB);
+  Serial.println(" MB");
+  Serial.println("=== Test complete ===");
 }
 
 void loop() {}

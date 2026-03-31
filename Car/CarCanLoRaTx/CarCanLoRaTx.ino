@@ -5,6 +5,7 @@
 #include <RH_RF95.h>
 #include <Adafruit_LSM6DSOX.h>
 #include <Adafruit_Sensor.h>
+#include <Adafruit_NeoPixel.h>
 
 // =====================================================================
 //  USER SETTINGS
@@ -18,9 +19,9 @@ static constexpr uint8_t PIN_SCK  = 14;
 static constexpr uint8_t PIN_MOSI = 15;
 
 // SPI chip selects
-static constexpr uint8_t CAN_CS   = 5;
+static constexpr uint8_t CAN_CS   = 12;  // D12 (GP12) — CAN chip select
 static constexpr uint8_t RFM95_CS = 16;
-static constexpr uint8_t SD_CS    = 28;  // A2 on Feather RP2040
+static constexpr uint8_t SD_CS    = 25;  // D25 (GP25) on Feather RP2040
 
 // RFM95 control pins
 static constexpr uint8_t RFM95_INT = 21;
@@ -32,10 +33,94 @@ static constexpr uint8_t RFM95_RST = 17;
 static constexpr uint8_t LED_RED = PIN_LED;
 
 // =====================================================================
+//  WARNING INDICATOR LEDs (SK6812 addressable, 1 LED per pin)
+// =====================================================================
+//  D5  = Engine warning        (red when CLT > CLT_WARN_C)
+//  D6  = Oil pressure warning  (red when oil_psi < OIL_WARN_PSI while engine running)
+//  D9  = Shift indicator       (blue when rpm > SHIFT_RPM)
+//  D10 = Low fuel warning      (amber when fuel thermistor > FUEL_LOW_THRESH_C)
+//  D11 = Neutral light         (green when gear == 0)
+//  D12 = CAN chip select — not available as LED pin
+//
+// Requires Adafruit NeoPixel library (Tools > Manage Libraries > "Adafruit NeoPixel")
+
+#define LEDS_PER_PIN 1
+
+static constexpr uint8_t PIN_LED_ENG_WARN  = 5;
+static constexpr uint8_t PIN_LED_OIL_WARN  = 6;
+static constexpr uint8_t PIN_LED_SHIFT      = 9;
+static constexpr uint8_t PIN_LED_FUEL_WARN = 10;
+static constexpr uint8_t PIN_LED_NEUTRAL   = 11;
+
+// Warning thresholds — tune as needed
+static constexpr float    CLT_WARN_C      = 105.0f;  // coolant temp warning (°C)
+static constexpr float    OIL_WARN_PSI    =  10.0f;  // oil pressure warning (psi) when engine running
+static constexpr float    SHIFT_RPM       = 11500.0f; // shift indicator RPM
+static constexpr float    OIL_CHECK_RPM   =  1000.0f; // only check oil pressure above this RPM
+
+// LED colors
+static const uint32_t COLOR_OFF   = Adafruit_NeoPixel::Color(0,   0,   0);
+static const uint32_t COLOR_RED   = Adafruit_NeoPixel::Color(255, 0,   0);
+static const uint32_t COLOR_GREEN = Adafruit_NeoPixel::Color(0,   255, 0);
+static const uint32_t COLOR_AMBER = Adafruit_NeoPixel::Color(255, 100, 0);
+static const uint32_t COLOR_BLUE  = Adafruit_NeoPixel::Color(0,   0,   255);
+
+Adafruit_NeoPixel ledEngWarn (LEDS_PER_PIN, PIN_LED_ENG_WARN,  NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledOilWarn (LEDS_PER_PIN, PIN_LED_OIL_WARN,  NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledShift   (LEDS_PER_PIN, PIN_LED_SHIFT,      NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledFuelWarn(LEDS_PER_PIN, PIN_LED_FUEL_WARN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledNeutral (LEDS_PER_PIN, PIN_LED_NEUTRAL,   NEO_GRB + NEO_KHZ800);
+
+// =====================================================================
+//  STEERING ANGLE SENSOR (A0 / GP26)
+// =====================================================================
+// Potentiometer: 0–5V, scaled to 0–3.3V via voltage divider before ADC.
+// Formula uses original 0–5V signal: θ = 75 × (V_orig − 3.35) / 1.045
+// ADC back-calculates: V_orig = V_adc × (5.0 / 3.3)
+// RP2040 ADC: 12-bit (0–4095), 3.3V reference.
+static constexpr uint8_t  PIN_STEER       = A0;  // GP26
+static constexpr uint32_t STEER_PERIOD_MS = 20;  // 50 Hz
+
+// =====================================================================
+//  FUEL LEVEL SENSOR — PANW 103395-395 NTC thermistor (A1 / GP27)
+// =====================================================================
+// Thermal dispersion method: current through thermistor causes self-heating.
+//   Submerged in fuel → fuel conducts heat away → thermistor reads COOLER
+//   In air (fuel below sensor) → no cooling → thermistor reads HOTTER
+// Wiring: 3.3V → 10kΩ pull-up → A1 → thermistor → GND
+// CALIBRATION: set FUEL_LOW_THRESH_C to midpoint between your "in fuel" and
+//              "in air" steady-state readings. Typically ~10–20°C above ambient.
+static constexpr uint8_t  PIN_FUEL_TEMP      = A1;       // GP27
+static constexpr float    FUEL_R_PULLUP      = 10000.0f; // 10kΩ pull-up resistor
+static constexpr float    FUEL_R25           = 10000.0f; // thermistor R at 25°C
+static constexpr float    FUEL_BETA          = 3950.0f;  // Beta constant (K)
+static constexpr float    FUEL_T0_K          = 298.15f;  // 25°C in Kelvin
+static constexpr float    FUEL_LOW_THRESH_C  = 45.0f;    // CALIBRATE: above this = fuel low
+
+// =====================================================================
+//  OIL TEMPERATURE 2 — eBay universal 1/8 NPT sender (A3 / GP29)
+// =====================================================================
+// Oil temp 1 comes from the PE3 ECU via CAN (g_oil_temp1_c, decoded from 0x770 row 4).
+// Oil temp 2 is this external sender — second measurement point on the engine.
+// Variable resistance sender, range 0–150°C. Single-wire — signal on wire, ground
+// through threaded body into engine block. Engine block MUST share GND with RP2040.
+// Wiring: 3.3V → 1kΩ pull-up → A3 → signal wire → [sender body] → engine block → GND
+// CALIBRATION NEEDED: measure sender resistance at known temperatures and
+// fill in OIL2_CAL_TEMP[] / OIL2_CAL_OHMS[] below. Current values are estimates.
+static constexpr uint8_t  PIN_OIL_TEMP2      = A3;     // GP29
+static constexpr float    OIL2_R_PULLUP      = 1000.0f; // 1kΩ pull-up resistor
+
+// Calibration table — (resistance Ω → temperature °C). Add more points for accuracy.
+// TO CALIBRATE: measure V_adc at known temps, compute R = R_pullup * V_adc / (3.3 - V_adc)
+static constexpr int      OIL2_CAL_POINTS = 5;
+static constexpr float    OIL2_CAL_OHMS[OIL2_CAL_POINTS] = { 180.0f, 130.0f, 90.0f, 60.0f, 35.0f };
+static constexpr float    OIL2_CAL_TEMP[OIL2_CAL_POINTS] = {  30.0f,  60.0f, 90.0f, 120.0f, 150.0f };
+
+static constexpr uint32_t TEMP_PERIOD_MS = 250; // sample both temp sensors at 4 Hz
+
+// =====================================================================
 //  MCP4725 DAC — Gear Indicator Output
 // =====================================================================
-// I2C address 0x60 (A0 pin = GND). Power VCC from 5V rail for 0-5V swing.
-// The I2C data lines run at 3.3V which the MCP4725 accepts fine.
 static constexpr uint8_t DAC_ADDR = 0x60;
 
 // PE3 ECU Analog #5 gear voltage midpoints (from Setup Gear screen):
@@ -59,14 +144,6 @@ static const uint16_t GEAR_DAC[6] = {
 // =====================================================================
 //  GEAR RATIO DETECTION — band + hysteresis
 // =====================================================================
-// Derived from RPM vs Speed graph (12T/42T drive, 2026 proposed).
-// Each gear line was read at ~14,000 RPM:
-//   1st: 33 mph  2nd: 45 mph  3rd: 54 mph  4th: 62 mph  5th: 68 mph
-// Slopes in RPM/mph divided by 1.609 to get RPM/kph:
-//   1st≈264  2nd≈193  3rd≈161  4th≈140  5th≈128
-// Band boundaries are midpoints between adjacent gear slopes.
-// Hysteresis: enterMin/enterMax is tight, stayMin/stayMax is ~8% wider.
-// Units: RPM / kph
 struct GearBand {
   float enterMin;
   float enterMax;
@@ -74,15 +151,15 @@ struct GearBand {
   float stayMax;
 };
 static constexpr GearBand GEAR_BANDS[5] = {
-  {228, 9999, 215, 9999},  // 1st  (ratio > 228 to enter)
+  {228, 9999, 215, 9999},  // 1st
   {177, 228,  165, 242 },  // 2nd
   {150, 177,  140, 185 },  // 3rd
   {134, 150,  126, 158 },  // 4th
   {  0, 134,    0, 142 },  // 5th
 };
-static constexpr float VEH_MOVING_KPH  = 3.0f;    // below ~2 mph = Neutral
-static constexpr float RPM_MIN         = 500.0f;  // below this = Neutral
-static constexpr uint8_t GEAR_CONFIRM  = 4;        // samples before switching
+static constexpr float VEH_MOVING_KPH  = 3.0f;
+static constexpr float RPM_MIN         = 500.0f;
+static constexpr uint8_t GEAR_CONFIRM  = 4;
 
 // =====================================================================
 //  IMU (LSM6DSOX via I2C, address 0x6A)
@@ -95,11 +172,8 @@ static constexpr float    RAD2DEG       = 57.295779513f;
 // =====================================================================
 //  SD CARD LOGGER
 // =====================================================================
-// Logs to /LOG_XXXX.CSV on the SD card.
-// CSV columns: ts_ms, rpm, veh_kph, gear, tps_pct, map_kpa,
-//              ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps
-static constexpr uint32_t SD_FLUSH_MS  = 1000;  // flush to SD every 1 second
-static constexpr size_t   LOG_BUF_SIZE = 8192;  // 8 KB — holds ~1s at 100 Hz
+static constexpr uint32_t SD_FLUSH_MS  = 1000;
+static constexpr size_t   LOG_BUF_SIZE = 8192;
 
 // =====================================================================
 //  MCP2515 LOW-LEVEL
@@ -208,12 +282,19 @@ uint32_t g_imuSeq   = 0;
 float    g_ax=0, g_ay=0, g_az=1.0f;
 float    g_gx=0, g_gy=0, g_gz=0;
 
-// TX-side CAN snapshot (for gear calc + SD log)
-float   g_rpm     = 0;
-float   g_veh_kph = 0;
-float   g_tps_pct = 0;
-float   g_map_kpa = 0;
-uint8_t g_gear    = 0;  // 0=neutral, 1-5=gear
+// TX-side CAN snapshot (for gear calc + SD log + warning LEDs)
+float   g_rpm      = 0;
+float   g_veh_kph  = 0;
+float   g_tps_pct  = 0;
+float   g_map_kpa  = 0;
+uint8_t g_gear     = 0;   // 0=neutral, 1-5=gear
+float   g_clt_c    = 0;   // coolant temp (°C)
+float   g_oil_psi  = 99;  // oil pressure (psi) — init high so no false warning at startup
+float   g_fuel_psi = 99;  // fuel pressure (psi) — init high
+float   g_steer_deg    = 0;    // steering angle (°), negative = left, positive = right
+float   g_fuel_temp_c  = 0;    // fuel level sensor temp (°C) — PANW 103395-395 on A1
+float   g_oil_temp1_c  = 0;    // oil temp 1 (°C) — from PE3 ECU via CAN (0x770 row 4)
+float   g_oil_temp2_c  = 0;    // oil temp 2 (°C) — eBay sender on A3
 
 // SD state
 bool     g_sdOk      = false;
@@ -229,9 +310,13 @@ uint32_t g_seq = 0;
 // LED + status timing
 uint32_t lastBlink    = 0;
 uint32_t lastStatus   = 0;
-uint32_t lastCanFrame = 0;  // for CAN timeout → neutral
-uint32_t lastGearCalc = 0;  // periodic gear recalc
-bool     ledState     = false;
+uint32_t lastCanFrame = 0;
+uint32_t lastGearCalc = 0;
+uint32_t lastLedUpdate   = 0;
+uint32_t lastSteerSample = 0;
+uint32_t lastTempSample   = 0;
+uint32_t lastAnalogTx     = 0;
+bool     ledState        = false;
 
 // =====================================================================
 //  HELPERS
@@ -250,7 +335,6 @@ static inline void put_i16_le(uint8_t *p, int16_t v) {
 // =====================================================================
 //  MCP4725 DAC
 // =====================================================================
-// Fast-write: 2 bytes — sets DAC output immediately
 void dacWrite(uint16_t val12) {
   val12 &= 0x0FFF;
   Wire.beginTransmission(DAC_ADDR);
@@ -259,28 +343,22 @@ void dacWrite(uint16_t val12) {
   uint8_t err = Wire.endTransmission();
   Serial.print(F("[DAC] val=")); Serial.print(val12);
   Serial.print(F(" V=")); Serial.print(val12 * 5.0f / 4095.0f, 3);
-  Serial.print(F("  I2C err=")); Serial.println(err);  // 0=OK, 2=NACK
+  Serial.print(F("  I2C err=")); Serial.println(err);
 }
 
 // =====================================================================
 //  GEAR DETECTION
 // =====================================================================
-// Returns 0 (neutral) or 1-5 (gear number).
-// Persistent state for hysteresis + debounce
 static uint8_t s_currentGear   = 0;
 static uint8_t s_candidateGear = 0;
 static uint8_t s_confirmCount  = 0;
 
 uint8_t calculateGear(float rpm, float kph) {
-  // Simple neutral: engine not running or not moving
   if (rpm <= 0.0f || rpm < RPM_MIN || kph < VEH_MOVING_KPH) {
     s_currentGear = 0; s_candidateGear = 0; s_confirmCount = 0;
     return 0;
   }
-
   float ratio = rpm / kph;
-
-  // 1. Try to stay in current gear (hysteresis stayMin/stayMax)
   if (s_currentGear >= 1 && s_currentGear <= 5) {
     const GearBand &b = GEAR_BANDS[s_currentGear - 1];
     if (ratio >= b.stayMin && ratio <= b.stayMax) {
@@ -289,8 +367,6 @@ uint8_t calculateGear(float rpm, float kph) {
       return s_currentGear;
     }
   }
-
-  // 2. Find which enter band the ratio falls in
   uint8_t candidate = 0;
   for (uint8_t i = 0; i < 5; i++) {
     if (ratio >= GEAR_BANDS[i].enterMin && ratio <= GEAR_BANDS[i].enterMax) {
@@ -298,23 +374,44 @@ uint8_t calculateGear(float rpm, float kph) {
       break;
     }
   }
-
-  // 3. Debounce — require GEAR_CONFIRM consistent readings before switching
   if (candidate == s_candidateGear) {
     if (s_confirmCount < GEAR_CONFIRM) s_confirmCount++;
   } else {
     s_candidateGear = candidate;
     s_confirmCount  = 1;
   }
-
-  if (s_confirmCount >= GEAR_CONFIRM) {
-    s_currentGear = s_candidateGear;
-  }
+  if (s_confirmCount >= GEAR_CONFIRM) s_currentGear = s_candidateGear;
   return s_currentGear;
 }
 
 // =====================================================================
-//  BOSCH CAN DECODE (TX-side snapshot for gear calc + SD logging)
+//  WARNING LED UPDATE
+// =====================================================================
+static void setLed(Adafruit_NeoPixel &strand, uint32_t color) {
+  strand.fill(color);
+  strand.show();
+}
+
+void updateWarningLEDs() {
+  // Engine warning (D5): coolant temp too high
+  setLed(ledEngWarn, (g_clt_c > CLT_WARN_C) ? COLOR_RED : COLOR_OFF);
+
+  // Oil pressure warning (D6): low oil pressure while engine running
+  bool oilWarn = (g_rpm > OIL_CHECK_RPM) && (g_oil_psi < OIL_WARN_PSI);
+  setLed(ledOilWarn, oilWarn ? COLOR_RED : COLOR_OFF);
+
+  // Low fuel warning (D10): thermistor hotter than threshold = fuel below sensor
+  setLed(ledFuelWarn, (g_fuel_temp_c > FUEL_LOW_THRESH_C) ? COLOR_AMBER : COLOR_OFF);
+
+  // Neutral light (D11): green when in neutral
+  setLed(ledNeutral, (g_gear == 0) ? COLOR_GREEN : COLOR_OFF);
+
+  // Shift indicator (D9): blue when above shift RPM
+  setLed(ledShift, (g_rpm >= SHIFT_RPM) ? COLOR_BLUE : COLOR_OFF);
+}
+
+// =====================================================================
+//  BOSCH CAN DECODE (TX-side snapshot)
 // =====================================================================
 static constexpr float BAR_TO_PSI = 14.503774f;
 static constexpr float PSI_TO_KPA = 6.894757f;
@@ -325,11 +422,19 @@ void updateTxSnapshot(const CanFrame &f) {
     g_rpm     = u16_lohi(f.d[1], f.d[2]) * 0.25f;
     g_veh_kph = u16_lohi(f.d[3], f.d[4]) * 0.00781f;
     g_tps_pct = f.d[5] * 0.391f;
+    if (f.dlc >= 8) {
+      uint8_t row = f.d[0];
+      if (row == 3) g_clt_c       = (float)f.d[7] - 40.0f;  // coolant temp
+      if (row == 4) g_oil_temp1_c = (float)f.d[7] - 39.0f;  // oil temp 1 (ECU)
+    }
   } else if (f.id == 0x790 && f.dlc >= 2) {
-    g_rpm = u16_lohi(f.d[0], f.d[1]);  // higher-res RPM
+    g_rpm = u16_lohi(f.d[0], f.d[1]);
     if (f.dlc >= 8) g_map_kpa = u16_lohi(f.d[6], f.d[7]) * 0.01f * PSI_TO_KPA;
   } else if (f.id == 0x771 && f.dlc >= 7 && f.d[0] == 0) {
     g_map_kpa = u16_lohi(f.d[5], f.d[6]) * 0.01f;
+  } else if (f.id == 0x771 && f.dlc >= 8 && f.d[0] == 3) {
+    g_fuel_psi = f.d[5] * 0.0515f * BAR_TO_PSI;  // fuel pressure
+    g_oil_psi  = f.d[7] * 0.0513f * BAR_TO_PSI;  // oil pressure
   }
 }
 
@@ -405,12 +510,29 @@ void sendImuBinary(float ax, float ay, float az,
   g_imuSeq++;
   put_u32_le(&pkt[2], g_imuSeq);
   put_u32_le(&pkt[6], (uint32_t)millis());
-  put_i16_le(&pkt[10], (int16_t)(ax * 1000.0f));  // 0.001 g
+  put_i16_le(&pkt[10], (int16_t)(ax * 1000.0f));
   put_i16_le(&pkt[12], (int16_t)(ay * 1000.0f));
   put_i16_le(&pkt[14], (int16_t)(az * 1000.0f));
-  put_i16_le(&pkt[16], (int16_t)(gx * 10.0f));    // 0.1 deg/s
+  put_i16_le(&pkt[16], (int16_t)(gx * 10.0f));
   put_i16_le(&pkt[18], (int16_t)(gy * 10.0f));
   put_i16_le(&pkt[20], (int16_t)(gz * 10.0f));
+  canCsHigh();
+  rf95.send(pkt, sizeof(pkt));
+  rf95.waitPacketSent();
+}
+
+// Packet type 0x03 — analog sensors: steering angle, oil temp 2 (external sender)
+// Format: [0xA5][0x03][seq:4][ts:4][steer_ddeg:2][oil2_t_ddeg:2] = 14 bytes
+// Values scaled as int16 × 10 (0.1° / 0.1°C resolution)
+void sendAnalogBinary() {
+  uint8_t pkt[14] = {0};
+  static uint32_t analogSeq = 0;
+  pkt[0] = 0xA5; pkt[1] = 0x03;
+  analogSeq++;
+  put_u32_le(&pkt[2], analogSeq);
+  put_u32_le(&pkt[6], (uint32_t)millis());
+  put_i16_le(&pkt[10], (int16_t)(g_steer_deg   * 10.0f));
+  put_i16_le(&pkt[12], (int16_t)(g_oil_temp2_c * 10.0f));
   canCsHigh();
   rf95.send(pkt, sizeof(pkt));
   rf95.waitPacketSent();
@@ -422,7 +544,7 @@ void sendImuBinary(float ax, float ay, float az,
 void sdInit() {
   pinMode(SD_CS, OUTPUT);
   digitalWrite(SD_CS, HIGH);
-  delay(250);  // SD power-up settling time
+  delay(250);
 
   if (!sd.begin(SdSpiConfig(SD_CS, SHARED_SPI, SD_SCK_MHZ(1)))) {
     Serial.print(F("SD: init failed — error code: 0x"));
@@ -433,7 +555,6 @@ void sdInit() {
     return;
   }
 
-  // Find next available log file: LOG_0001.CSV, LOG_0002.CSV ...
   char fname[16];
   for (uint16_t n = 1; n <= 9999; n++) {
     snprintf(fname, sizeof(fname), "LOG_%04u.CSV", n);
@@ -449,30 +570,25 @@ void sdInit() {
     return;
   }
 
-  // Write CSV header
   g_logFile.println(F("ts_ms,rpm,veh_kph,gear,tps_pct,map_kpa,"
-                       "ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps"));
+                       "ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,steer_deg,fuel_temp_c,oil_temp1_c,oil_temp2_c"));
   g_logFile.sync();
   g_sdOk = true;
   Serial.print(F("SD: logging to ")); Serial.println(fname);
 }
 
-// Append one row to the in-RAM buffer. Flush to SD when buffer is nearly full.
 void sdLog(uint32_t ts) {
   if (!g_sdOk) return;
-
   char row[120];
   int len = snprintf(row, sizeof(row),
-    "%lu,%.1f,%.2f,%u,%.1f,%.2f,%.4f,%.4f,%.4f,%.2f,%.2f,%.2f\n",
+    "%lu,%.1f,%.2f,%u,%.1f,%.2f,%.4f,%.4f,%.4f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f\n",
     (unsigned long)ts,
     g_rpm, g_veh_kph, (unsigned)g_gear,
     g_tps_pct, g_map_kpa,
     g_ax, g_ay, g_az,
-    g_gx, g_gy, g_gz);
-
+    g_gx, g_gy, g_gz,
+    g_steer_deg, g_fuel_temp_c, g_oil_temp1_c, g_oil_temp2_c);
   if (len <= 0) return;
-
-  // If buffer would overflow, flush first
   if (g_logPos + (size_t)len >= LOG_BUF_SIZE) {
     g_logFile.write(g_logBuf, g_logPos);
     g_logPos = 0;
@@ -491,6 +607,51 @@ void sdFlush() {
 }
 
 // =====================================================================
+//  TEMPERATURE SENSORS
+// =====================================================================
+
+// PANW 103395-395: Beta equation  T = 1 / (1/T0 + (1/Beta)*ln(R/R0))
+void readFuelTemp() {
+  int raw = analogRead(PIN_FUEL_TEMP);
+  float v_adc = raw * (3.3f / 4095.0f);
+  if (v_adc <= 0.01f || v_adc >= 3.29f) return;  // open/short circuit guard
+  float r_therm = FUEL_R_PULLUP * v_adc / (3.3f - v_adc);
+  float t_k = 1.0f / (1.0f / FUEL_T0_K + (1.0f / FUEL_BETA) * logf(r_therm / FUEL_R25));
+  g_fuel_temp_c = t_k - 273.15f;
+}
+
+// eBay oil temp 2 sender: linear interpolation through calibration table
+void readOilTemp2() {
+  int raw = analogRead(PIN_OIL_TEMP2);
+  float v_adc = raw * (3.3f / 4095.0f);
+  if (v_adc <= 0.01f || v_adc >= 3.29f) return;  // open/short circuit guard
+  float r_sender = OIL2_R_PULLUP * v_adc / (3.3f - v_adc);
+
+  // Clamp to table edges
+  if (r_sender >= OIL2_CAL_OHMS[0]) { g_oil_temp2_c = OIL2_CAL_TEMP[0]; return; }
+  if (r_sender <= OIL2_CAL_OHMS[OIL2_CAL_POINTS - 1]) { g_oil_temp2_c = OIL2_CAL_TEMP[OIL2_CAL_POINTS - 1]; return; }
+
+  // Find bracketing pair and interpolate
+  for (int i = 0; i < OIL2_CAL_POINTS - 1; i++) {
+    if (r_sender <= OIL2_CAL_OHMS[i] && r_sender >= OIL2_CAL_OHMS[i + 1]) {
+      float frac = (r_sender - OIL2_CAL_OHMS[i]) / (OIL2_CAL_OHMS[i + 1] - OIL2_CAL_OHMS[i]);
+      g_oil_temp2_c = OIL2_CAL_TEMP[i] + frac * (OIL2_CAL_TEMP[i + 1] - OIL2_CAL_TEMP[i]);
+      return;
+    }
+  }
+}
+
+// =====================================================================
+//  STEERING ANGLE
+// =====================================================================
+void readSteeringAngle() {
+  int raw = analogRead(PIN_STEER);                      // 0–4095
+  float v_adc  = raw * (3.3f / 4095.0f);               // ADC voltage (0–3.3V)
+  float v_orig = v_adc * (5.0f / 3.3f);                // back-calc original pot voltage (0–5V)
+  g_steer_deg  = 75.0f * (v_orig - 3.35f) / 1.045f;   // θ = 75 × (V − 3.35) / 1.045
+}
+
+// =====================================================================
 //  SETUP
 // =====================================================================
 void setup() {
@@ -499,6 +660,19 @@ void setup() {
 
   Serial.begin(115200);
   delay(600);
+
+  // Warning LEDs — init all off
+  pinMode(PIN_STEER,     INPUT);
+  pinMode(PIN_FUEL_TEMP, INPUT);
+  pinMode(PIN_OIL_TEMP2, INPUT);
+  analogReadResolution(12);  // RP2040 12-bit ADC
+
+  ledEngWarn.begin();  ledEngWarn.setBrightness(200);  ledEngWarn.clear();  ledEngWarn.show();
+  ledOilWarn.begin();  ledOilWarn.setBrightness(200);  ledOilWarn.clear();  ledOilWarn.show();
+  ledFuelWarn.begin(); ledFuelWarn.setBrightness(200); ledFuelWarn.clear(); ledFuelWarn.show();
+  ledNeutral.begin();  ledNeutral.setBrightness(200);  ledNeutral.clear();  ledNeutral.show();
+  ledShift.begin();    ledShift.setBrightness(200);    ledShift.clear();    ledShift.show();
+  Serial.println(F("Warning LEDs: initialized"));
 
   SPI.setRX(PIN_MISO);
   SPI.setTX(PIN_MOSI);
@@ -514,12 +688,10 @@ void setup() {
   digitalWrite(RFM95_RST, LOW);  delay(10);
   digitalWrite(RFM95_RST, HIGH); delay(10);
 
-  Serial.println(F("=== CAN->LoRa TX (binary) | Gear DAC | SD Logger ==="));
+  Serial.println(F("=== CAN->LoRa TX (binary) | Gear DAC | SD Logger | Warning LEDs ==="));
 
-  // SD card MUST be initialized first on a shared SPI bus
   sdInit();
 
-  // LoRa init
   if (!rf95.init()) {
     Serial.println(F("ERROR: rf95.init() failed"));
     while (1) { digitalWrite(LED_RED, !digitalRead(LED_RED)); delay(100); }
@@ -531,7 +703,6 @@ void setup() {
   rf95.setTxPower(LORA_TX_POWER_DBM, false);
   Serial.print(F("LoRa OK @ ")); Serial.print(LORA_FREQ_MHZ); Serial.println(F(" MHz"));
 
-  // CAN init @ 500 kbps
   bool canOk = mcpInit500k_16MHz();
   Serial.print(F("MCP2515 @500kbps: ")); Serial.println(canOk ? F("OK") : F("FAIL"));
   if (!canOk) {
@@ -539,11 +710,9 @@ void setup() {
     while (1) { digitalWrite(LED_RED, !digitalRead(LED_RED)); delay(200); }
   }
 
-  // I2C for IMU + DAC
   Wire.begin();
   Wire.setClock(400000);
 
-  // IMU init
   g_imuOk = imu.begin_I2C(IMU_ADDR, &Wire);
   if (g_imuOk) {
     imu.setAccelRange(LSM6DS_ACCEL_RANGE_4_G);
@@ -570,11 +739,10 @@ void setup() {
     Serial.println(F("IMU: LSM6DSOX not found at 0x6A"));
   }
 
-  // DAC init — output neutral voltage
   dacWrite(GEAR_DAC[0]);
   Serial.println(F("MCP4725 DAC: initialized (Neutral voltage)"));
 
-  lastCanFrame = millis();  // don't trigger CAN timeout immediately
+  lastCanFrame = millis();
   Serial.println(F("TX running."));
 }
 
@@ -601,6 +769,13 @@ void loop() {
     Serial.print(F(" rpm=")); Serial.print(g_rpm,0);
     Serial.print(F(" kph=")); Serial.print(g_veh_kph,1);
     Serial.print(F(" ratio=")); Serial.print(g_veh_kph > 1.0f ? g_rpm/g_veh_kph : 0, 1);
+    Serial.print(F(" clt=")); Serial.print(g_clt_c,1); Serial.print(F("C"));
+    Serial.print(F(" oil=")); Serial.print(g_oil_psi,1); Serial.print(F("psi"));
+    Serial.print(F(" fuel=")); Serial.print(g_fuel_psi,1); Serial.print(F("psi"));
+    Serial.print(F(" steer="));    Serial.print(g_steer_deg,1);   Serial.print(F("deg"));
+    Serial.print(F(" fuel_t="));   Serial.print(g_fuel_temp_c,1);  Serial.print(F("C"));
+    Serial.print(F(" oil_t1="));  Serial.print(g_oil_temp1_c,1); Serial.print(F("C"));
+    Serial.print(F(" oil_t2="));  Serial.print(g_oil_temp2_c,1); Serial.print(F("C"));
     Serial.print(F(" EFLG=0x")); Serial.print(eflg, HEX);
     if (eflg==0) Serial.print(F(" OK"));
     Serial.println();
@@ -626,7 +801,7 @@ void loop() {
     Serial.print(F(" gz="));      Serial.print(g_gz,1); Serial.println(F("dps"));
 
     sendImuBinary(g_ax, g_ay, g_az, g_gx, g_gy, g_gz);
-    sdLog(now);  // 100 Hz log row
+    sdLog(now);
   }
 
   // SD flush every second
@@ -635,16 +810,15 @@ void loop() {
     sdFlush();
   }
 
-  // CAN timeout — if no frames for >500ms, zero stale RPM/kph
+  // CAN timeout — zero stale values after 500ms with no frames
   if ((now - lastCanFrame) > 500UL) {
     g_rpm = 0; g_veh_kph = 0;
   }
 
-  // Gear recalc every 100ms — doesn't depend on CAN frames arriving
+  // Gear recalc + DAC update every 100ms
   if (now - lastGearCalc >= 100UL) {
     lastGearCalc = now;
     uint8_t newGear = calculateGear(g_rpm, g_veh_kph);
-    // Debug: always print so we can see what's happening
     Serial.print(F("[GCALC] rpm=")); Serial.print(g_rpm, 1);
     Serial.print(F(" kph=")); Serial.print(g_veh_kph, 2);
     Serial.print(F(" ratio="));
@@ -654,6 +828,31 @@ void loop() {
       g_gear = newGear;
       dacWrite(GEAR_DAC[g_gear]);
     }
+  }
+
+  // Steering angle sample at 50 Hz
+  if (now - lastSteerSample >= STEER_PERIOD_MS) {
+    lastSteerSample = now;
+    readSteeringAngle();
+  }
+
+  // Fuel temp + oil temp sample at 4 Hz
+  if (now - lastTempSample >= TEMP_PERIOD_MS) {
+    lastTempSample = now;
+    readFuelTemp();
+    readOilTemp2();
+  }
+
+  // Transmit analog sensors (steering, fuel level temp, oil temp) at 10 Hz
+  if (now - lastAnalogTx >= 100UL) {
+    lastAnalogTx = now;
+    sendAnalogBinary();
+  }
+
+  // Warning LED update every 100ms
+  if (now - lastLedUpdate >= 100UL) {
+    lastLedUpdate = now;
+    updateWarningLEDs();
   }
 
   // Poll CAN RX flags
@@ -675,8 +874,6 @@ void loop() {
     }
     Serial.println();
     printDecoded(f);
-
-    // Update TX snapshot (gear recalc runs on 100ms timer above)
     updateTxSnapshot(f);
     sendFrameBinary(f);
   };
