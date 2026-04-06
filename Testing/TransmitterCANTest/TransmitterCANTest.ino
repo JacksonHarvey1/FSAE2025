@@ -1,160 +1,268 @@
 // TransmitterCANTest.ino
 //
-// Simulates PE3 Bosch MS4.3 telemetry on an Adafruit Feather RP2040 CAN board
-// and publishes the condensed telemetry snapshot over LoRa (RFM95/RH_RF95).
-// The packet layout mirrors the scaling used in Dyno/DynoRP204CANHATINtegration
-// so the receiver can sanity-check values without needing the full JSON output.
+// Simulates Bosch MS4.3 / PE3 ECU telemetry on an Adafruit Feather RP2040 RFM95
+// and transmits three binary packet types over LoRa, matching the wire format
+// used by Car/CarCanLoRaTx/CarCanLoRaTx.ino exactly.
 //
-// Packet format (all little-endian):
-//   Byte 0  : 0xAA preamble
-//   Byte 1  : protocol version (currently 0x01)
-//   Byte 2  : sequence number (wraps at 255)
-//   Byte 3  : payload length in bytes (should be 34)
-//   Byte 4-7  : uint32 timestamp (ms since boot)
-//   Byte 8-9  : uint16 rpm (1 rpm/bit)
-//   Byte 10-11: int16  tps_pct_tenths (0.1 %/bit)
-//   Byte 12-13: int16  fot_ms_tenths (0.1 ms/bit)
-//   Byte 14-15: int16  ign_deg_tenths (0.1 deg/bit)
-//   Byte 16-17: uint16 map_kpa_centi (0.01 kPa/bit)
-//   Byte 18-19: uint16 baro_kpa_centi (0.01 kPa/bit)
-//   Byte 20-21: uint16 lambda_milli (0.001/bit)
-//   Byte 22-23: int16  oil_psi_tenths (0.1 psi/bit)
-//   Byte 24-25: uint16 batt_v_centi (0.01 V/bit)
-//   Byte 26-27: int16  coolant_c_tenths (0.1 C/bit)
-//   Byte 28-29: int16  air_c_tenths (0.1 C/bit)
-//   Byte 30-37: uint16 wheel speed Hz_tenths for FL, FR, BL, BR (0.1 Hz/bit)
+// Packet types (all little-endian, preamble 0xA5):
 //
-// LoRa settings match Testing/TransmitterTest.ino so this sketch can be paired
-// with Testing/ReciverCANTest/ReciverCANTest.ino for a full end-to-end check.
+//   0x01 — CAN frame (24 bytes):
+//     [0xA5][0x01][flags][dlc][id:4LE][ts:4LE][data:8][seq:4LE]
+//     flags: bit0=ext, bit1=rtr
+//
+//   0x02 — IMU (22 bytes):
+//     [0xA5][0x02][imuSeq:4LE][ts:4LE]
+//     [ax_mg:2][ay_mg:2][az_mg:2]   (int16, units = 0.001 g)
+//     [gx_ddps:2][gy_ddps:2][gz_ddps:2] (int16, units = 0.1 dps)
+//
+//   0x03 — Analog sensors (14 bytes):
+//     [0xA5][0x03][seq:4LE][ts:4LE][steer_ddeg:2][oil2_ddegC:2]
+//     (int16, units = 0.1° / 0.1°C)
+//
+// CAN frame IDs simulated: 0x770, 0x771, 0x772, 0x790 (Bosch MS4.3 layout).
+// Use with Testing/ReciverCANTest to verify end-to-end decode.
 
 #include <Arduino.h>
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <math.h>
 
+// =====================================================================
+//  HARDWARE
+// =====================================================================
 #define RFM95_CS   16
 #define RFM95_RST  17
 #define RFM95_INT  21
-#define RF95_FREQ  915.0
+#define RF95_FREQ  915.0f
+#define CAN_CS     12   // pulled high — not used in test, just deselected
 
-// If a CAN wing / other SPI device is stacked:
-#define CAN_CS     5
+// =====================================================================
+//  TIMING
+// =====================================================================
+static constexpr uint32_t CAN_PERIOD_MS    = 10;   // one CAN frame/cycle per slot
+static constexpr uint32_t IMU_PERIOD_MS    = 10;   // 100 Hz IMU
+static constexpr uint32_t ANALOG_PERIOD_MS = 20;   // 50 Hz analog
+static constexpr uint32_t BLINK_MS         = 500;
 
-static constexpr uint8_t  LORA_PREAMBLE      = 0xAA;
-static constexpr uint8_t  LORA_VERSION       = 0x01;
-static constexpr uint8_t  LORA_PAYLOAD_BYTES = 34;
-static constexpr uint8_t  PACKET_BYTES       = 4 + LORA_PAYLOAD_BYTES;
-static constexpr uint32_t SEND_PERIOD_MS     = 10;   // 100 Hz snapshot
-static constexpr uint32_t BLINK_MS           = 500;
+// =====================================================================
+//  CONSTANTS (match CarCanLoRaTx)
+// =====================================================================
+static constexpr float BAR_TO_PSI = 14.503774f;
+static constexpr float PSI_TO_KPA = 6.894757f;
 
+// =====================================================================
+//  GLOBALS
+// =====================================================================
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
-struct TelemetrySnapshot {
-  uint16_t rpm;
-  float    tps_pct;
-  float    fot_ms;
-  float    ign_deg;
-  float    map_kpa;
-  float    baro_kpa;
-  float    lambda;
-  float    oil_psi;
-  float    batt_v;
-  float    coolant_c;
-  float    air_c;
-  float    ws_fl_hz;
-  float    ws_fr_hz;
-  float    ws_bl_hz;
-  float    ws_br_hz;
-};
+// Simulated sensor values
+float sim_rpm       = 0, sim_kph      = 0, sim_tps_pct  = 0;
+float sim_ign_deg   = 0, sim_map_kpa  = 0, sim_lambda    = 0;
+float sim_fuel_psi  = 0, sim_oil_psi  = 0, sim_batt_v    = 0;
+float sim_clt_c     = 0, sim_iat_c    = 0, sim_oil_t1_c  = 0;
+float sim_inj_ms    = 0, sim_steer_deg= 0, sim_oil_t2_c  = 0;
+float sim_ax        = 0, sim_ay       = 0, sim_az        = 0;
+float sim_gx        = 0, sim_gy       = 0, sim_gz        = 0;
 
-TelemetrySnapshot g_snapshot = {};
-uint8_t           g_seq      = 0;
-uint32_t          g_lastSend = 0;
-uint32_t          g_lastBlink = 0;
-bool              g_ledState = false;
+// Sequence counters
+uint32_t g_canSeq    = 0;
+uint32_t g_imuSeq    = 0;
+uint32_t g_analogSeq = 0;
 
-static inline uint16_t clampU16(float v) {
-  if (v < 0.0f) return 0;
-  if (v > 65535.0f) return 65535;
-  return static_cast<uint16_t>(v + 0.5f);
-}
+uint32_t g_lastCan    = 0;
+uint32_t g_lastImu    = 0;
+uint32_t g_lastAnalog = 0;
+uint32_t g_lastBlink  = 0;
+bool     g_ledState   = false;
 
-static inline int16_t clampS16(float v) {
-  if (v < -32768.0f) return -32768;
-  if (v > 32767.0f)  return 32767;
-  return static_cast<int16_t>(v + (v >= 0 ? 0.5f : -0.5f));
-}
+// CAN frame cycle state
+static uint8_t s_770row  = 0;           // cycles 0-9
+static uint8_t s_771idx  = 0;           // indexes into {0,1,3}
+static uint8_t s_772idx  = 0;           // indexes into {0,3}
+static uint8_t s_frameSlot = 0;         // 0-12: 10×0x770, 1×0x771, 1×0x772, 1×0x790
 
-static inline void writeU16LE(uint8_t *buf, size_t &idx, uint16_t value) {
-  buf[idx++] = value & 0xFF;
-  buf[idx++] = value >> 8;
-}
+static const uint8_t k771rows[3] = {0, 1, 3};
+static const uint8_t k772rows[2] = {0, 3};
 
-static inline void writeS16LE(uint8_t *buf, size_t &idx, int16_t value) {
-  writeU16LE(buf, idx, static_cast<uint16_t>(value));
-}
-
-static inline void writeU32LE(uint8_t *buf, size_t &idx, uint32_t value) {
-  buf[idx++] = (uint8_t)(value & 0xFF);
-  buf[idx++] = (uint8_t)((value >> 8) & 0xFF);
-  buf[idx++] = (uint8_t)((value >> 16) & 0xFF);
-  buf[idx++] = (uint8_t)((value >> 24) & 0xFF);
-}
-
-void simulatePe3Snapshot(uint32_t nowMs) {
-  // Basic waveform generators to mimic live CAN data.
+// =====================================================================
+//  WAVEFORM GENERATOR — realistic fake sensor values
+// =====================================================================
+void simulateSensors(uint32_t nowMs) {
   float t = nowMs / 1000.0f;
 
-  g_snapshot.rpm      = 2500 + (uint16_t)(1200.0f * (sinf(t * 0.9f) * 0.5f + 0.5f));
-  g_snapshot.tps_pct  = 30.0f + 50.0f * (sinf(t * 1.3f + 0.5f) * 0.5f + 0.5f);
-  g_snapshot.fot_ms   = 2.2f + 0.8f * (sinf(t * 0.7f + 1.0f) * 0.5f + 0.5f);
-  g_snapshot.ign_deg  = 12.0f + 6.0f * sinf(t * 0.5f);
+  sim_rpm      = 2500.0f + 1500.0f * (sinf(t * 0.9f)  * 0.5f + 0.5f);
+  sim_kph      = sim_rpm / 85.0f;
+  sim_tps_pct  = 20.0f  + 60.0f  * (sinf(t * 1.1f + 0.3f) * 0.5f + 0.5f);
+  sim_ign_deg  = 12.0f  + 6.0f   * sinf(t * 0.5f);
+  sim_map_kpa  = 90.0f  + 25.0f  * (sinf(t * 0.4f) * 0.5f + 0.5f);
+  sim_lambda   = 0.97f  + 0.04f  * sinf(t * 1.7f);
+  sim_fuel_psi = 55.0f  + 5.0f   * sinf(t * 0.3f);
+  sim_oil_psi  = 50.0f  + 8.0f   * sinf(t * 0.3f + 1.2f);
+  sim_batt_v   = 13.4f  + 0.3f   * sinf(t * 0.15f);
+  sim_clt_c    = 82.0f  + 8.0f   * (sinf(t * 0.2f)  * 0.5f + 0.5f);
+  sim_iat_c    = 35.0f  + 5.0f   * sinf(t * 0.8f);
+  sim_oil_t1_c = 90.0f  + 10.0f  * (sinf(t * 0.15f) * 0.5f + 0.5f);
+  sim_inj_ms   = 2.5f   + 0.8f   * sinf(t * 0.7f);
+  sim_steer_deg= 25.0f  * sinf(t * 0.6f);
+  sim_oil_t2_c = 88.0f  + 12.0f  * (sinf(t * 0.18f) * 0.5f + 0.5f);
 
-  g_snapshot.map_kpa  = 95.0f + 20.0f * (sinf(t * 0.4f) * 0.5f + 0.5f);
-  g_snapshot.baro_kpa = 101.3f;
-  g_snapshot.lambda   = 0.96f + 0.04f * sinf(t * 1.7f);
-
-  g_snapshot.oil_psi  = 50.0f + 8.0f * sinf(t * 0.3f + 1.2f);
-  g_snapshot.batt_v   = 13.4f + 0.25f * sinf(t * 0.15f);
-  g_snapshot.coolant_c = 82.0f + 6.0f * (sinf(t * 0.25f) * 0.5f + 0.5f);
-  g_snapshot.air_c     = 32.0f + 4.0f * sinf(t * 0.9f);
-
-  float wsBase = (g_snapshot.rpm / 60.0f) / 4.4f; // crude wheel speed estimate (Hz)
-  g_snapshot.ws_fl_hz = max(0.0f, wsBase * (1.00f + 0.02f * sinf(t * 0.8f)));
-  g_snapshot.ws_fr_hz = max(0.0f, wsBase * (0.98f + 0.03f * sinf(t * 0.6f + 0.5f)));
-  g_snapshot.ws_bl_hz = max(0.0f, wsBase * (1.01f + 0.02f * sinf(t * 0.75f + 1.0f)));
-  g_snapshot.ws_br_hz = max(0.0f, wsBase * (0.99f + 0.03f * sinf(t * 0.55f + 1.3f)));
+  sim_ax = 0.05f * sinf(t * 2.3f);
+  sim_ay = 0.10f * sinf(t * 1.8f + 0.5f);
+  sim_az = 1.00f + 0.02f * sinf(t * 3.1f);
+  sim_gx = 3.0f  * sinf(t * 2.0f);
+  sim_gy = 2.0f  * sinf(t * 1.5f + 1.0f);
+  sim_gz = 1.5f  * sinf(t * 1.2f + 0.3f);
 }
 
-size_t buildTelemetryPacket(uint8_t *outBuf, size_t maxLen, uint32_t nowMs) {
-  if (maxLen < PACKET_BYTES) return 0;
-
-  size_t idx = 0;
-  outBuf[idx++] = LORA_PREAMBLE;
-  outBuf[idx++] = LORA_VERSION;
-  outBuf[idx++] = g_seq++;
-  outBuf[idx++] = LORA_PAYLOAD_BYTES;
-
-  writeU32LE(outBuf, idx, nowMs);
-  writeU16LE(outBuf, idx, g_snapshot.rpm);
-  writeS16LE(outBuf, idx, clampS16(g_snapshot.tps_pct * 10.0f));
-  writeS16LE(outBuf, idx, clampS16(g_snapshot.fot_ms * 10.0f));
-  writeS16LE(outBuf, idx, clampS16(g_snapshot.ign_deg * 10.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.map_kpa * 100.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.baro_kpa * 100.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.lambda * 1000.0f));
-  writeS16LE(outBuf, idx, clampS16(g_snapshot.oil_psi * 10.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.batt_v * 100.0f));
-  writeS16LE(outBuf, idx, clampS16(g_snapshot.coolant_c * 10.0f));
-  writeS16LE(outBuf, idx, clampS16(g_snapshot.air_c * 10.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.ws_fl_hz * 10.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.ws_fr_hz * 10.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.ws_bl_hz * 10.0f));
-  writeU16LE(outBuf, idx, clampU16(g_snapshot.ws_br_hz * 10.0f));
-
-  return idx;
+// =====================================================================
+//  PACKET HELPERS
+// =====================================================================
+static inline void putU16LE(uint8_t *p, uint16_t v) {
+  p[0] = v & 0xFF; p[1] = v >> 8;
+}
+static inline void putI16LE(uint8_t *p, int16_t v) {
+  putU16LE(p, (uint16_t)v);
+}
+static inline void putU32LE(uint8_t *p, uint32_t v) {
+  p[0]=(uint8_t)(v);      p[1]=(uint8_t)(v>>8);
+  p[2]=(uint8_t)(v>>16);  p[3]=(uint8_t)(v>>24);
 }
 
+// =====================================================================
+//  BOSCH FRAME ENCODERS
+//  Encoding reverses the decode formulas in CarCanLoRaTx updateTxSnapshot()
+//  and printDecoded().
+// =====================================================================
+
+// 0x770 — RPM / VEH / TPS / IGN / row-muxed byte
+// Decode refs: rpm = u16_lohi(d[1],d[2])*0.25   → raw = rpm/0.25 = rpm*4
+//              kph = u16_lohi(d[3],d[4])*0.00781 → raw = kph/0.00781
+//              tps = d[5]*0.391                  → raw = tps/0.391
+//              ign = (int8_t)d[6]*1.365           → raw = ign/1.365
+void make0x770(uint8_t *d, uint8_t row) {
+  uint16_t raw_rpm = (uint16_t)(sim_rpm * 4.0f);
+  uint16_t raw_kph = (uint16_t)(sim_kph / 0.00781f);
+  uint8_t  raw_tps = (uint8_t) constrain(sim_tps_pct / 0.391f,  0, 255);
+  int8_t   raw_ign = (int8_t)  constrain(sim_ign_deg / 1.365f, -128, 127);
+  d[0] = row;
+  d[1] = raw_rpm & 0xFF;  d[2] = raw_rpm >> 8;
+  d[3] = raw_kph & 0xFF;  d[4] = raw_kph >> 8;
+  d[5] = raw_tps;
+  d[6] = (uint8_t)raw_ign;
+  switch (row) {
+    case 3: d[7] = (uint8_t)constrain(sim_clt_c    + 40.0f, 0, 255); break;
+    case 4: d[7] = (uint8_t)constrain(sim_oil_t1_c + 39.0f, 0, 255); break;
+    case 6: d[7] = (uint8_t)constrain(sim_iat_c    + 40.0f, 0, 255); break;
+    case 9: d[7] = 1;  break;  // gear 1 placeholder
+    default: d[7] = 0; break;
+  }
+}
+
+// 0x771 — MAP / battery / fuel+oil pressures
+// row 0: map_kpa = u16_lohi(d[5],d[6])*0.01        → raw = map_kpa*100
+// row 1: batt_v  = d[7]*0.111                       → raw = batt_v/0.111
+// row 3: fuel_psi = d[5]*0.0515*BAR_TO_PSI          → raw = fuel_psi/(0.0515*BAR_TO_PSI)
+//        oil_psi  = d[7]*0.0513*BAR_TO_PSI          → raw = oil_psi/(0.0513*BAR_TO_PSI)
+void make0x771(uint8_t *d, uint8_t row) {
+  memset(d, 0, 8);
+  d[0] = row;
+  switch (row) {
+    case 0: {
+      uint16_t raw_map = (uint16_t)(sim_map_kpa * 100.0f);
+      d[5] = raw_map & 0xFF;  d[6] = raw_map >> 8;
+      break;
+    }
+    case 1:
+      d[7] = (uint8_t)constrain(sim_batt_v / 0.111f, 0, 255);
+      break;
+    case 3:
+      d[5] = (uint8_t)constrain(sim_fuel_psi / (0.0515f * BAR_TO_PSI), 0, 255);
+      d[7] = (uint8_t)constrain(sim_oil_psi  / (0.0513f * BAR_TO_PSI), 0, 255);
+      break;
+  }
+}
+
+// 0x772 — lambda / injection time
+// row 0: lambda  = u16_lohi(d[2],d[3])*0.000244 → raw = lambda/0.000244
+// row 3: inj_ms  = d[2]*0.8192                  → raw = inj_ms/0.8192
+void make0x772(uint8_t *d, uint8_t row) {
+  memset(d, 0, 8);
+  d[0] = row;
+  switch (row) {
+    case 0: {
+      uint16_t raw_l = (uint16_t)(sim_lambda / 0.000244f);
+      d[2] = raw_l & 0xFF;  d[3] = raw_l >> 8;  // L1
+      d[4] = raw_l & 0xFF;  d[5] = raw_l >> 8;  // L2 (same)
+      break;
+    }
+    case 3:
+      d[2] = (uint8_t)constrain(sim_inj_ms / 0.8192f, 0, 255);
+      break;
+  }
+}
+
+// 0x790 — high-res RPM / ignition / MAP
+// rpm    = u16_lohi(d[0],d[1])          → raw = (uint16_t)rpm
+// ign    = u16_lohi(d[4],d[5])*0.1      → raw = ign_deg*10
+// map    = u16_lohi(d[6],d[7])*0.01*PSI_TO_KPA → raw = (map_kpa/PSI_TO_KPA)*100
+void make0x790(uint8_t *d) {
+  memset(d, 0, 8);
+  uint16_t raw_rpm = (uint16_t)sim_rpm;
+  d[0] = raw_rpm & 0xFF;  d[1] = raw_rpm >> 8;
+  uint16_t raw_ign = (uint16_t)(sim_ign_deg * 10.0f);
+  d[4] = raw_ign & 0xFF;  d[5] = raw_ign >> 8;
+  uint16_t raw_map = (uint16_t)((sim_map_kpa / PSI_TO_KPA) * 100.0f);
+  d[6] = raw_map & 0xFF;  d[7] = raw_map >> 8;
+}
+
+// =====================================================================
+//  LORA SENDERS  (match CarCanLoRaTx wire format exactly)
+// =====================================================================
+void sendCanFrame(uint32_t canId, const uint8_t *data, uint8_t dlc, uint32_t nowMs) {
+  uint8_t pkt[24] = {0};
+  pkt[0] = 0xA5;  pkt[1] = 0x01;
+  pkt[2] = 0x00;  // flags: standard frame, no RTR
+  pkt[3] = dlc;
+  putU32LE(&pkt[4],  canId);
+  putU32LE(&pkt[8],  nowMs);
+  for (uint8_t i = 0; i < 8 && i < dlc; i++) pkt[12 + i] = data[i];
+  g_canSeq++;
+  putU32LE(&pkt[20], g_canSeq);
+  rf95.send(pkt, sizeof(pkt));
+  rf95.waitPacketSent();
+}
+
+void sendImu(uint32_t nowMs) {
+  uint8_t pkt[22] = {0};
+  pkt[0] = 0xA5;  pkt[1] = 0x02;
+  g_imuSeq++;
+  putU32LE(&pkt[2],  g_imuSeq);
+  putU32LE(&pkt[6],  nowMs);
+  putI16LE(&pkt[10], (int16_t)(sim_ax * 1000.0f));
+  putI16LE(&pkt[12], (int16_t)(sim_ay * 1000.0f));
+  putI16LE(&pkt[14], (int16_t)(sim_az * 1000.0f));
+  putI16LE(&pkt[16], (int16_t)(sim_gx * 10.0f));
+  putI16LE(&pkt[18], (int16_t)(sim_gy * 10.0f));
+  putI16LE(&pkt[20], (int16_t)(sim_gz * 10.0f));
+  rf95.send(pkt, sizeof(pkt));
+  rf95.waitPacketSent();
+}
+
+void sendAnalog(uint32_t nowMs) {
+  uint8_t pkt[14] = {0};
+  pkt[0] = 0xA5;  pkt[1] = 0x03;
+  g_analogSeq++;
+  putU32LE(&pkt[2],  g_analogSeq);
+  putU32LE(&pkt[6],  nowMs);
+  putI16LE(&pkt[10], (int16_t)(sim_steer_deg * 10.0f));
+  putI16LE(&pkt[12], (int16_t)(sim_oil_t2_c  * 10.0f));
+  rf95.send(pkt, sizeof(pkt));
+  rf95.waitPacketSent();
+}
+
+// =====================================================================
+//  SETUP
+// =====================================================================
 void initRadio() {
   pinMode(CAN_CS, OUTPUT);
   digitalWrite(CAN_CS, HIGH);
@@ -165,70 +273,100 @@ void initRadio() {
   SPI.begin();
 
   pinMode(RFM95_RST, OUTPUT);
-  digitalWrite(RFM95_RST, HIGH);
-  delay(10);
-  digitalWrite(RFM95_RST, LOW);
-  delay(10);
-  digitalWrite(RFM95_RST, HIGH);
-  delay(10);
+  digitalWrite(RFM95_RST, HIGH); delay(10);
+  digitalWrite(RFM95_RST, LOW);  delay(10);
+  digitalWrite(RFM95_RST, HIGH); delay(10);
 
   if (!rf95.init()) {
-    Serial.println("ERROR: LoRa radio init FAILED");
+    Serial.println(F("ERROR: LoRa init FAILED"));
     while (1) delay(100);
   }
-
   if (!rf95.setFrequency(RF95_FREQ)) {
-    Serial.println("ERROR: setFrequency FAILED");
+    Serial.println(F("ERROR: setFrequency FAILED"));
     while (1) delay(100);
   }
-
-  rf95.setTxPower(13, false);
-  Serial.println("LoRa init OK @ 915 MHz");
+  rf95.setTxPower(20, false);
+  Serial.println(F("LoRa init OK @ 915 MHz  20 dBm"));
 }
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-
   Serial.begin(115200);
-  Serial.println("\n--- Simulated PE3 CAN → LoRa TX ---");
-
+  delay(500);
+  Serial.println(F("\n--- Simulated Bosch MS4.3 -> LoRa TX ---"));
   initRadio();
 }
 
+// =====================================================================
+//  LOOP
+// =====================================================================
 void loop() {
   uint32_t now = millis();
 
   if (now - g_lastBlink >= BLINK_MS) {
     g_lastBlink = now;
-    g_ledState = !g_ledState;
+    g_ledState  = !g_ledState;
     digitalWrite(LED_BUILTIN, g_ledState);
   }
 
-  simulatePe3Snapshot(now);
+  simulateSensors(now);
 
-  if (now - g_lastSend >= SEND_PERIOD_MS) {
-    g_lastSend = now;
+  // ── CAN frames — one frame per period, cycling through all types ────
+  // Slot layout (13 slots per full cycle):
+  //   0-9  : 0x770 (one row per slot, rows 0-9)
+  //   10   : 0x771 (cycling rows 0, 1, 3)
+  //   11   : 0x772 (cycling rows 0, 3)
+  //   12   : 0x790
+  if (now - g_lastCan >= CAN_PERIOD_MS) {
+    g_lastCan = now;
+    uint8_t d[8] = {0};
 
-    uint8_t packet[PACKET_BYTES] = {0};
-    size_t bytes = buildTelemetryPacket(packet, sizeof(packet), now);
-    if (bytes > 0) {
-      rf95.send(packet, bytes);
-      rf95.waitPacketSent();
-
-      Serial.print("[TX] seq=");
-      Serial.print(packet[2]);
-      Serial.print(" rpm=");
-      Serial.print(g_snapshot.rpm);
-      Serial.print(" tps=%");
-      Serial.print(g_snapshot.tps_pct, 1);
-      Serial.print(" map_kpa=");
-      Serial.print(g_snapshot.map_kpa, 1);
-      Serial.print(" lambda=");
-      Serial.print(g_snapshot.lambda, 3);
-      Serial.print(" oil_psi=");
-      Serial.print(g_snapshot.oil_psi, 1);
+    if (s_frameSlot <= 9) {
+      make0x770(d, s_770row);
+      sendCanFrame(0x770, d, 8, now);
+      Serial.print(F("[TX 0x770] row=")); Serial.print(s_770row);
+      Serial.print(F("  rpm="));  Serial.print(sim_rpm, 0);
+      Serial.print(F("  kph="));  Serial.print(sim_kph, 1);
+      Serial.print(F("  tps="));  Serial.print(sim_tps_pct, 1);
       Serial.println();
+      s_770row = (s_770row + 1) % 10;
+
+    } else if (s_frameSlot == 10) {
+      uint8_t row = k771rows[s_771idx];
+      make0x771(d, row);
+      sendCanFrame(0x771, d, 8, now);
+      Serial.print(F("[TX 0x771] row=")); Serial.println(row);
+      s_771idx = (s_771idx + 1) % 3;
+
+    } else if (s_frameSlot == 11) {
+      uint8_t row = k772rows[s_772idx];
+      make0x772(d, row);
+      sendCanFrame(0x772, d, 8, now);
+      Serial.print(F("[TX 0x772] row=")); Serial.println(row);
+      s_772idx = (s_772idx + 1) % 2;
+
+    } else {
+      make0x790(d);
+      sendCanFrame(0x790, d, 8, now);
+      Serial.print(F("[TX 0x790] rpm=")); Serial.print(sim_rpm, 0);
+      Serial.print(F("  ign="));          Serial.print(sim_ign_deg, 1);
+      Serial.print(F("  map_kpa="));      Serial.println(sim_map_kpa, 1);
     }
+
+    s_frameSlot = (s_frameSlot + 1) % 13;
+  }
+
+  // ── IMU ─────────────────────────────────────────────────────────────
+  if (now - g_lastImu >= IMU_PERIOD_MS) {
+    g_lastImu = now;
+    sendImu(now);
+  }
+
+  // ── Analog sensors ───────────────────────────────────────────────────
+  if (now - g_lastAnalog >= ANALOG_PERIOD_MS) {
+    g_lastAnalog = now;
+    sendAnalog(now);
+    Serial.print(F("[TX 0x03] steer="));  Serial.print(sim_steer_deg, 1);
+    Serial.print(F("  oil_t2="));         Serial.println(sim_oil_t2_c, 1);
   }
 }
