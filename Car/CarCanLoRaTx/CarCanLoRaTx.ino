@@ -19,7 +19,7 @@ static constexpr uint8_t PIN_SCK  = 14;
 static constexpr uint8_t PIN_MOSI = 15;
 
 // SPI chip selects
-static constexpr uint8_t CAN_CS   = 12;  // D12 (GP12) — CAN chip select
+static constexpr uint8_t CAN_CS   = 5;   // GP5 — Adafruit CAN FeatherWing CS (confirmed from DynoRP2040_MCP2515Wing)
 static constexpr uint8_t RFM95_CS = 16;
 static constexpr uint8_t SD_CS    = 25;  // D25 (GP25) on Feather RP2040
 
@@ -35,18 +35,18 @@ static constexpr uint8_t LED_RED = PIN_LED;
 // =====================================================================
 //  WARNING INDICATOR LEDs (SK6812 addressable, 1 LED per pin)
 // =====================================================================
-//  D5  = Engine warning        (red when CLT > CLT_WARN_C)
+//  D7  = Engine warning        (red when CLT > CLT_WARN_C)  — moved from D5 (D5 = CAN CS)
 //  D6  = Oil pressure warning  (red when oil_psi < OIL_WARN_PSI while engine running)
 //  D9  = Shift indicator       (blue when rpm > SHIFT_RPM)
 //  D10 = Low fuel warning      (amber when fuel thermistor > FUEL_LOW_THRESH_C)
 //  D11 = Neutral light         (green when gear == 0)
-//  D12 = CAN chip select — not available as LED pin
+//  D5  = CAN FeatherWing chip select — not available as LED pin
 //
 // Requires Adafruit NeoPixel library (Tools > Manage Libraries > "Adafruit NeoPixel")
 
 #define LEDS_PER_PIN 1
 
-static constexpr uint8_t PIN_LED_ENG_WARN  = 5;
+static constexpr uint8_t PIN_LED_ENG_WARN  = 7;   // moved from 5 — pin 5 is CAN FeatherWing CS
 static constexpr uint8_t PIN_LED_OIL_WARN  = 6;
 static constexpr uint8_t PIN_LED_SHIFT      = 9;
 static constexpr uint8_t PIN_LED_FUEL_WARN = 10;
@@ -246,6 +246,7 @@ bool mcpSetMode(uint8_t mode) {
 // 500 kbps @ 16 MHz — Bosch MS4.3
 bool mcpInit500k_16MHz() {
   mcpReset();
+
   if (!mcpSetMode(MODE_CONFIG)) return false;
   mcpWrite(CNF1, 0x01); mcpWrite(CNF2, 0x90); mcpWrite(CNF3, 0x02);
   mcpWrite(RXB0CTRL, 0x60); mcpWrite(RXB1CTRL, 0x60);
@@ -679,8 +680,9 @@ void setup() {
   SPI.setSCK(PIN_SCK);
   SPI.begin();
 
-  pinMode(CAN_CS, OUTPUT); canCsHigh();
-  pinMode(SD_CS,  OUTPUT); digitalWrite(SD_CS, HIGH);
+  pinMode(RFM95_CS, OUTPUT); digitalWrite(RFM95_CS, HIGH);  // hold high before SD init shares SPI bus
+  pinMode(CAN_CS,   OUTPUT); canCsHigh();
+  pinMode(SD_CS,    OUTPUT); digitalWrite(SD_CS, HIGH);
 
   // LoRa reset
   pinMode(RFM95_RST, OUTPUT);

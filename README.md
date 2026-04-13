@@ -75,14 +75,14 @@ FSAE2025/
 | SPI MISO | 8 | Shared CAN / LoRa / SD |
 | SPI MOSI | 15 | Shared |
 | SPI SCK | 14 | Shared |
-| MCP2515 CS | 12 | Keep high when not selected |
+| MCP2515 CS | 5 | Adafruit CAN FeatherWing default CS |
 | RFM95 CS / INT / RST | 16 / 21 / 17 | RFM95 is on-board; RST toggled at boot |
 | SD CS | 25 | Initialize SD *before* the radio |
 | I2C SDA / SCL | 2 / 3 | IMU (0x6A) + DAC (0x60) |
 | Steering angle ADC | A0 (GP26) | 0–5 V pot → voltage divider → 0–3.3 V |
 | Fuel level thermistor | A1 (GP27) | 10 kΩ pull-up to 3.3 V (PANW 103395-395 NTC) |
 | Oil temp sender #2 | A3 (GP29) | 1 kΩ pull-up to 3.3 V (1/8 NPT universal sender) |
-| Engine warning LED | 5 | SK6812 NeoPixel — red if CLT > 105 °C |
+| Engine warning LED | 7 | SK6812 NeoPixel — red if CLT > 105 °C (moved from 5; 5 = CAN CS) |
 | Oil pressure warning LED | 6 | SK6812 NeoPixel — red if oil < 10 psi while running |
 | Shift indicator LED | 9 | SK6812 NeoPixel — blue if RPM > 11 500 |
 | Low fuel warning LED | 10 | SK6812 NeoPixel — amber if fuel thermistor > 45 °C |
@@ -178,6 +178,54 @@ Gyro bias is averaged over 1 second at boot and subtracted from every sample.
 | **Fuel level** | A1 / GP27 thermistor — `FUEL_LOW_THRESH_C = 45 °C` threshold (thermal dispersion: hotter = fuel below sensor) |
 | **Gear DAC output** | `MCP4725` drives PE3 Analog #5: N=0.305 V, 1st=1.00 V, 2nd=1.70 V, 3rd=2.50 V, 4th=3.305 V, 5th=4.095 V |
 
+### InfluxDB Schema
+
+The ingest script (`Dyno/dyno_ingest_influx.py`) writes all fields to a single measurement.
+
+| Parameter | Value |
+|-----------|-------|
+| **Measurement** | `telemetry` |
+| **Tag: system** | `dyno` |
+| **Tag: node** | `rp2040` |
+| **Organisation** | `yorkracing` |
+| **Bucket** | `telemetry` |
+
+| InfluxDB Field | Source | Units |
+|----------------|--------|-------|
+| `rpm` | 0x770 / 0x790 | rpm |
+| `veh_kph` | 0x770 | km/h |
+| `tps_pct` | 0x770 | % |
+| `ign_deg` | 0x770 / 0x790 | °BTDC |
+| `map_kpa` | 0x771 row 0 | kPa |
+| `map_ext_kpa` | 0x790 | kPa |
+| `lambda1` | 0x772 row 0 | λ |
+| `lambda2` | 0x772 row 0 | λ |
+| `batt_v` | 0x771 row 1 | V |
+| `coolant_c` | 0x770 row 3 | °C |
+| `oil_temp_c` | 0x770 row 4 | °C |
+| `air_c` | 0x770 row 6 | °C |
+| `gear` | 0x770 row 9 | 0–5 |
+| `fuel_psi` | 0x771 row 3 | psi |
+| `oil_psi` | 0x771 row 3 | psi |
+| `inj_ms` | 0x772 row 3 | ms |
+| `ax_g` | IMU packet 0x02 | g |
+| `ay_g` | IMU packet 0x02 | g |
+| `az_g` | IMU packet 0x02 | g |
+| `gx_dps` | IMU packet 0x02 | °/s |
+| `gy_dps` | IMU packet 0x02 | °/s |
+| `gz_dps` | IMU packet 0x02 | °/s |
+| `rssi` | LoRa link quality | dBm |
+
+Example Flux query for Grafana:
+```flux
+from(bucket: "telemetry")
+  |> range(start: -5m)
+  |> filter(fn: (r) => r._measurement == "telemetry")
+  |> filter(fn: (r) => r._field == "rpm" or r._field == "tps_pct")
+```
+
+---
+
 ### Warning Indicators (on-car LEDs only, not transmitted)
 
 | LED | Trigger |
@@ -192,6 +240,7 @@ Gyro bias is averaged over 1 second at boot and subtracted from every sample.
 
 ## Raspberry Pi + Cloud Stack (`Dyno/`)
 * **Live ingest script** - `Dyno/dyno_ingest_influx.py` auto-detects the Feather serial port, filters non-JSON lines, de-dupes packets, and writes measurements to InfluxDB 2.x using the `influxdb-client` Python SDK. Environment overrides: `TELEM_PORT`, `TELEM_BAUD`, `INFLUX_URL`, `INFLUX_ORG`, `INFLUX_BUCKET`, `INFLUX_TOKEN` or `INFLUX_TOKEN_FILE`.
+* **Full Pi setup guide** - `Dyno/PI_SETUP.md` covers everything end-to-end: WiFi hotspot, Docker stack autostart, and ingest autostart on a fresh Pi. Start here for any new hardware.
 * **Docker services** - `Dyno/stack/compose.yaml` launches InfluxDB 2 + Grafana with persistent volumes. Copy the example secrets in `Dyno/stack/secrets/`, edit passwords/tokens, then `docker compose up -d`. Helper scripts (`setup_grafana.sh`, `fix_influxdb.sh`, etc.) automate first-boot tasks.
 * **Dash UI** - `Dyno/Dyno_Final.py` is a Plotly Dash app for laptops or the Pi. It auto-detects the serial port, streams packets, and exposes UI controls for key selection, time window, and theming. `Dyno/dyno_simple.py` is a lighter matplotlib live plot.
 * **Services & Wi-Fi** - `Dyno/dyno-ingest.service` and `Dyno/start_ingest.sh` provide systemd units for auto-start, while `Dyno/WIFI_HOTSPOT_SETUP.md` documents the dedicated `YorkRacing` hotspot used at the track/dyno.
