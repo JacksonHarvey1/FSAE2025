@@ -12,8 +12,8 @@ Complete setup guide for a fresh Pi. After following this guide the Pi will:
 
 | | |
 |---|---|
-| **WiFi SSID** | `YorkRacing` |
-| **WiFi password** | `fsae2025` |
+| **WiFi SSID** | `GrafanaNetwork` |
+| **WiFi password** | `kachow` |
 | **Grafana** | `http://192.168.4.1:3000` |
 | **Grafana login** | `admin` / `fsae2025` |
 | **InfluxDB** | `http://192.168.4.1:8086` |
@@ -33,11 +33,13 @@ cd ~
 git clone https://github.com/your-org/FSAE2025.git
 ```
 
-> **Debian (non-Raspberry Pi OS) users:** The Broadcom WiFi firmware is not pre-installed. Install it first or `wlan0` will not appear:
+> **Debian (non-Raspberry Pi OS) users:** The Broadcom WiFi firmware is not pre-installed and the driver module is not loaded at boot. Run both steps or `wlan0` will not appear:
 > ```bash
-> sudo apt update && sudo apt install -y firmware-brcm80211 && sudo reboot
+> sudo apt update && sudo apt install -y firmware-brcm80211
+> echo "brcmfmac" | sudo tee -a /etc/modules
+> sudo reboot
 > ```
-> After reboot, confirm `ip link show wlan0` and `sudo rfkill list all` show the interface and no hard block.
+> After reboot, confirm `ip link show wlan0` shows the interface before continuing.
 
 ---
 
@@ -183,20 +185,20 @@ This is the correct method if `NetworkManager` is `active`.
 
 ```bash
 # Create the persistent hotspot connection
-sudo nmcli con add type wifi ifname wlan0 con-name YorkRacing autoconnect yes ssid YorkRacing
-sudo nmcli con modify YorkRacing 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared
-sudo nmcli con modify YorkRacing wifi-sec.key-mgmt wpa-psk wifi-sec.psk fsae2025
-sudo nmcli con modify YorkRacing ipv4.addresses 192.168.4.1/24
+sudo nmcli con add type wifi ifname wlan0 con-name GrafanaNetwork autoconnect yes ssid GrafanaNetwork
+sudo nmcli con modify GrafanaNetwork 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared
+sudo nmcli con modify GrafanaNetwork wifi-sec.key-mgmt wpa-psk wifi-sec.psk kachow
+sudo nmcli con modify GrafanaNetwork ipv4.addresses 192.168.4.1/24
 
 # Bring it up now (also comes up automatically on every boot)
-sudo nmcli con up YorkRacing
+sudo nmcli con up GrafanaNetwork
 ```
 
 Verify:
 
 ```bash
-ip addr show wlan0          # should show 192.168.4.1
-nmcli con show YorkRacing   # autoconnect should be yes
+ip addr show wlan0               # should show 192.168.4.1
+nmcli con show GrafanaNetwork    # autoconnect should be yes
 ```
 
 ---

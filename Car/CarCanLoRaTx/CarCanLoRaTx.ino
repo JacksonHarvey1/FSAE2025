@@ -11,7 +11,7 @@
 //  USER SETTINGS
 // =====================================================================
 static constexpr float   LORA_FREQ_MHZ     = 915.0;
-static constexpr uint8_t LORA_TX_POWER_DBM = 20;
+static constexpr uint8_t LORA_TX_POWER_DBM = 17;  // reduced from 20 to limit TX current spike (~120mA→~65mA) which was drooping 3.3V rail and resetting IMU
 
 // SPI bus pins (Feather RP2040 RFM95)
 static constexpr uint8_t PIN_MISO = 8;
@@ -660,7 +660,10 @@ void setup() {
   digitalWrite(LED_RED, LOW);
 
   Serial.begin(115200);
-  delay(600);
+
+  // 5-second startup delay — lets the 3.3V rail, IMU, and all peripherals
+  // fully stabilise before any initialisation begins.
+  delay(5000);
 
   // Warning LEDs — init all off
   pinMode(PIN_STEER,     INPUT);
@@ -715,7 +718,15 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
 
-  g_imuOk = imu.begin_I2C(IMU_ADDR, &Wire);
+  // Retry up to 5 times with 50ms gaps in case the rail is still settling.
+  for (uint8_t attempt = 0; attempt < 5 && !g_imuOk; attempt++) {
+    g_imuOk = imu.begin_I2C(IMU_ADDR, &Wire);
+    if (!g_imuOk) {
+      Serial.print(F("IMU: init attempt ")); Serial.print(attempt + 1); Serial.println(F(" failed, retrying..."));
+      delay(50);
+    }
+  }
+
   if (g_imuOk) {
     imu.setAccelRange(LSM6DS_ACCEL_RANGE_4_G);
     imu.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
@@ -738,7 +749,7 @@ void setup() {
     Serial.print(g_gbx,3); Serial.print(F(", "));
     Serial.print(g_gby,3); Serial.print(F(", ")); Serial.println(g_gbz,3);
   } else {
-    Serial.println(F("IMU: LSM6DSOX not found at 0x6A"));
+    Serial.println(F("IMU: LSM6DSOX not found at 0x6A after 5 attempts"));
   }
 
   dacWrite(GEAR_DAC[0]);
