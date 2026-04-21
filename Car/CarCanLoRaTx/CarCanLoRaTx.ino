@@ -649,7 +649,7 @@ void readSteeringAngle() {
   int raw = analogRead(PIN_STEER);                      // 0–4095
   float v_adc  = raw * (3.3f / 4095.0f);               // ADC voltage (0–3.3V)
   float v_orig = v_adc * (5.0f / 3.3f);                // back-calc original pot voltage (0–5V)
-  g_steer_deg  = 75.0f * (v_orig - 3.35f) / 1.045f;   // θ = 75 × (V − 3.35) / 1.045
+  g_steer_deg  = 75.0f * (v_orig - 2.391f) / 1.045f;  // 0° when v_adc = 1.578 V
 }
 
 // =====================================================================
