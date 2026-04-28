@@ -28,6 +28,7 @@ services:
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 0.5s
       # Note: these env vars only affect the *initial* admin user on first boot.
       # Grafana persists its DB in grafana-data.
       GF_SECURITY_ADMIN_PASSWORD: "ChangeMe_Once"
