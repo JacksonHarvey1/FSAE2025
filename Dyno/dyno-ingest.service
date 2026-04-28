@@ -7,8 +7,8 @@ Wants=network-online.target
 Type=simple
 
 # Update this if your username/path differs
-User=jackson
-WorkingDirectory=/home/jackson/FSAE2025
+User=ycracing
+WorkingDirectory=/home/ycracing/FSAE2025
 
 # Influx connection
 Environment=INFLUX_URL=http://localhost:8086
@@ -16,7 +16,7 @@ Environment=INFLUX_ORG=yorkracing
 Environment=INFLUX_BUCKET=telemetry
 
 # Token (recommended: point at your docker compose secret file)
-Environment=INFLUX_TOKEN_FILE=/home/jackson/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token
+Environment=INFLUX_TOKEN_FILE=/home/ycracing/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token
 
 # Serial settings (defaults match Dyno/dyno_simple.py)
 Environment=TELEM_PORT=/dev/ttyACM0
@@ -29,7 +29,7 @@ Environment=TELEM_NODE=rp2040
 # Fields
 Environment=TELEM_KEYS=rpm,tps_pct,map_kpa,batt_v,coolant_c
 
-ExecStart=/usr/bin/python3 /home/jackson/FSAE2025/Dyno/dyno_ingest_influx.py
+ExecStart=/usr/bin/python3 /home/ycracing/FSAE2025/Dyno/dyno_ingest_influx.py
 Restart=always
 RestartSec=1
 
