@@ -52,11 +52,14 @@ static constexpr uint8_t PIN_LED_SHIFT      = 9;
 static constexpr uint8_t PIN_LED_FUEL_WARN = 10;
 static constexpr uint8_t PIN_LED_NEUTRAL   = 11;
 
+// Neutral switch input — wire neutral position sensor/switch to this pin and GND
+// INPUT_PULLUP: LOW = neutral, HIGH = in gear
+static constexpr uint8_t PIN_NEUTRAL_SWITCH = 4;
+
 // Warning thresholds — tune as needed
-static constexpr float    CLT_WARN_C      = 105.0f;  // coolant temp warning (°C)
-static constexpr float    OIL_WARN_PSI    =  10.0f;  // oil pressure warning (psi) when engine running
-static constexpr float    SHIFT_RPM       = 11500.0f; // shift indicator RPM
-static constexpr float    OIL_CHECK_RPM   =  1000.0f; // only check oil pressure above this RPM
+static constexpr float    CLT_WARN_F      = 200.0f;  // coolant temp warning (°F)
+static constexpr float    OIL_WARN_PSI    =  30.0f;  // oil pressure warning (psi)
+static constexpr float    SHIFT_RPM       = 13000.0f; // shift indicator RPM
 
 // LED colors
 static const uint32_t COLOR_OFF   = Adafruit_NeoPixel::Color(0,   0,   0);
@@ -95,7 +98,8 @@ static constexpr float    FUEL_R_PULLUP      = 10000.0f; // 10kΩ pull-up resist
 static constexpr float    FUEL_R25           = 10000.0f; // thermistor R at 25°C
 static constexpr float    FUEL_BETA          = 3950.0f;  // Beta constant (K)
 static constexpr float    FUEL_T0_K          = 298.15f;  // 25°C in Kelvin
-static constexpr float    FUEL_LOW_THRESH_C  = 45.0f;    // CALIBRATE: above this = fuel low
+static constexpr float    FUEL_LOW_THRESH_V  = 1.64f;    // A1 voltage below this = fuel low
+static constexpr uint32_t FUEL_LOW_DELAY_MS = 15000;    // must stay below threshold for this long before warning
 
 // =====================================================================
 //  OIL TEMPERATURE 2 — eBay universal 1/8 NPT sender (A3 / GP29)
@@ -289,11 +293,13 @@ float   g_veh_kph  = 0;
 float   g_tps_pct  = 0;
 float   g_map_kpa  = 0;
 uint8_t g_gear     = 0;   // 0=neutral, 1-5=gear
-float   g_clt_c    = 0;   // coolant temp (°C)
+float   g_clt_f    = 0;   // coolant temp (°F)
 float   g_oil_psi  = 99;  // oil pressure (psi) — init high so no false warning at startup
 float   g_fuel_psi = 99;  // fuel pressure (psi) — init high
 float   g_steer_deg    = 0;    // steering angle (°), negative = left, positive = right
 float   g_fuel_temp_c  = 0;    // fuel level sensor temp (°C) — PANW 103395-395 on A1
+float    g_fuel_voltage  = 0;    // raw A1 voltage (V) — used for fuel low threshold
+uint32_t g_fuelLowSince  = 0;    // millis() when voltage first dropped below threshold (0 = not low)
 float   g_oil_temp1_c  = 0;    // oil temp 1 (°C) — from PE3 ECU via CAN (0x770 row 4)
 float   g_oil_temp2_c  = 0;    // oil temp 2 (°C) — eBay sender on A3
 
@@ -317,6 +323,7 @@ uint32_t lastLedUpdate   = 0;
 uint32_t lastSteerSample = 0;
 uint32_t lastTempSample   = 0;
 uint32_t lastAnalogTx     = 0;
+uint32_t lastSdLog        = 0;
 bool     ledState        = false;
 
 // =====================================================================
@@ -394,18 +401,24 @@ static void setLed(Adafruit_NeoPixel &strand, uint32_t color) {
 }
 
 void updateWarningLEDs() {
-  // Engine warning (D5): coolant temp too high
-  setLed(ledEngWarn, (g_clt_c > CLT_WARN_C) ? COLOR_RED : COLOR_OFF);
+  // Engine warning (D7): coolant temp above 200°F
+  setLed(ledEngWarn, (g_clt_f > CLT_WARN_F) ? COLOR_RED : COLOR_OFF);
 
-  // Oil pressure warning (D6): low oil pressure while engine running
-  bool oilWarn = (g_rpm > OIL_CHECK_RPM) && (g_oil_psi < OIL_WARN_PSI);
-  setLed(ledOilWarn, oilWarn ? COLOR_RED : COLOR_OFF);
+  // Oil pressure warning (D6): oil pressure below 30 psi
+  setLed(ledOilWarn, (g_oil_psi < OIL_WARN_PSI) ? COLOR_RED : COLOR_OFF);
 
-  // Low fuel warning (D10): thermistor hotter than threshold = fuel below sensor
-  setLed(ledFuelWarn, (g_fuel_temp_c > FUEL_LOW_THRESH_C) ? COLOR_AMBER : COLOR_OFF);
+  // Low fuel warning (D10): A1 below 1.64V continuously for 15s = fuel low
+  uint32_t nowLed = millis();
+  if (g_fuel_voltage < FUEL_LOW_THRESH_V) {
+    if (g_fuelLowSince == 0) g_fuelLowSince = nowLed;
+  } else {
+    g_fuelLowSince = 0;
+  }
+  bool fuelLow = (g_fuelLowSince != 0) && ((nowLed - g_fuelLowSince) >= FUEL_LOW_DELAY_MS);
+  setLed(ledFuelWarn, fuelLow ? COLOR_AMBER : COLOR_OFF);
 
-  // Neutral light (D11): green when in neutral
-  setLed(ledNeutral, (g_gear == 0) ? COLOR_GREEN : COLOR_OFF);
+  // Neutral light (D11): physical switch on PIN_NEUTRAL_SWITCH (active LOW)
+  setLed(ledNeutral, (digitalRead(PIN_NEUTRAL_SWITCH) == LOW) ? COLOR_GREEN : COLOR_OFF);
 
   // Shift indicator (D9): blue when above shift RPM
   setLed(ledShift, (g_rpm >= SHIFT_RPM) ? COLOR_BLUE : COLOR_OFF);
@@ -425,7 +438,7 @@ void updateTxSnapshot(const CanFrame &f) {
     g_tps_pct = f.d[5] * 0.391f;
     if (f.dlc >= 8) {
       uint8_t row = f.d[0];
-      if (row == 3) g_clt_c       = (float)f.d[7] - 40.0f;  // coolant temp
+      if (row == 3) g_clt_f       = (float)f.d[7] - 40.0f;  // coolant temp
       if (row == 4) g_oil_temp1_c = (float)f.d[7] - 39.0f;  // oil temp 1 (ECU)
     }
   } else if (f.id == 0x790 && f.dlc >= 2) {
@@ -451,7 +464,7 @@ void printDecoded(const CanFrame &f) {
     Serial.print(F(" TPS=")); Serial.print(f.d[5]*0.391f,1); Serial.print('%');
     Serial.print(F(" IGN=")); Serial.print((int8_t)f.d[6]*1.365f,1); Serial.print(F("deg"));
     if (f.dlc>=8) {
-      if (row==3) { Serial.print(F(" CLT=")); Serial.print(f.d[7]-40); Serial.print('C'); }
+      if (row==3) { Serial.print(F(" CLT=")); Serial.print(f.d[7]-40); Serial.print('F'); }
       if (row==4) { Serial.print(F(" OilT=")); Serial.print(f.d[7]-39); Serial.print('C'); }
       if (row==6) { Serial.print(F(" IAT=")); Serial.print(f.d[7]-40); Serial.print('C'); }
       if (row==9) { Serial.print(F(" Gear=")); Serial.print(f.d[7]); }
@@ -571,8 +584,7 @@ void sdInit() {
     return;
   }
 
-  g_logFile.println(F("ts_ms,rpm,veh_kph,gear,tps_pct,map_kpa,"
-                       "ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,steer_deg,fuel_temp_c,oil_temp1_c,oil_temp2_c"));
+  g_logFile.println(F("ts_s,rpm,gear,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,steer_deg"));
   g_logFile.sync();
   g_sdOk = true;
   Serial.print(F("SD: logging to ")); Serial.println(fname);
@@ -580,15 +592,14 @@ void sdInit() {
 
 void sdLog(uint32_t ts) {
   if (!g_sdOk) return;
-  char row[120];
+  char row[80];
   int len = snprintf(row, sizeof(row),
-    "%lu,%.1f,%.2f,%u,%.1f,%.2f,%.4f,%.4f,%.4f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f\n",
-    (unsigned long)ts,
-    g_rpm, g_veh_kph, (unsigned)g_gear,
-    g_tps_pct, g_map_kpa,
+    "%.3f,%.1f,%u,%.4f,%.4f,%.4f,%.2f,%.2f,%.2f,%.2f\n",
+    ts * 0.001f,
+    g_rpm, (unsigned)g_gear,
     g_ax, g_ay, g_az,
     g_gx, g_gy, g_gz,
-    g_steer_deg, g_fuel_temp_c, g_oil_temp1_c, g_oil_temp2_c);
+    g_steer_deg);
   if (len <= 0) return;
   if (g_logPos + (size_t)len >= LOG_BUF_SIZE) {
     g_logFile.write(g_logBuf, g_logPos);
@@ -615,6 +626,7 @@ void sdFlush() {
 void readFuelTemp() {
   int raw = analogRead(PIN_FUEL_TEMP);
   float v_adc = raw * (3.3f / 4095.0f);
+  g_fuel_voltage = v_adc;
   if (v_adc <= 0.01f || v_adc >= 3.29f) return;  // open/short circuit guard
   float r_therm = FUEL_R_PULLUP * v_adc / (3.3f - v_adc);
   float t_k = 1.0f / (1.0f / FUEL_T0_K + (1.0f / FUEL_BETA) * logf(r_therm / FUEL_R25));
@@ -649,7 +661,7 @@ void readSteeringAngle() {
   int raw = analogRead(PIN_STEER);                      // 0–4095
   float v_adc  = raw * (3.3f / 4095.0f);               // ADC voltage (0–3.3V)
   float v_orig = v_adc * (5.0f / 3.3f);                // back-calc original pot voltage (0–5V)
-  g_steer_deg  = 75.0f * (v_orig - 2.391f) / 1.045f;  // 0° when v_adc = 1.578 V
+  g_steer_deg  = 75.0f * (v_orig - 2.391f) / 1.045f + 8.0f;
 }
 
 // =====================================================================
@@ -666,6 +678,7 @@ void setup() {
   delay(5000);
 
   // Warning LEDs — init all off
+  pinMode(PIN_NEUTRAL_SWITCH, INPUT_PULLUP);
   pinMode(PIN_STEER,     INPUT);
   pinMode(PIN_FUEL_TEMP, INPUT);
   pinMode(PIN_OIL_TEMP2, INPUT);
@@ -782,7 +795,7 @@ void loop() {
     Serial.print(F(" rpm=")); Serial.print(g_rpm,0);
     Serial.print(F(" kph=")); Serial.print(g_veh_kph,1);
     Serial.print(F(" ratio=")); Serial.print(g_veh_kph > 1.0f ? g_rpm/g_veh_kph : 0, 1);
-    Serial.print(F(" clt=")); Serial.print(g_clt_c,1); Serial.print(F("C"));
+    Serial.print(F(" clt=")); Serial.print(g_clt_f,1); Serial.print(F("F"));
     Serial.print(F(" oil=")); Serial.print(g_oil_psi,1); Serial.print(F("psi"));
     Serial.print(F(" fuel=")); Serial.print(g_fuel_psi,1); Serial.print(F("psi"));
     Serial.print(F(" steer="));    Serial.print(g_steer_deg,1);   Serial.print(F("deg"));
@@ -814,6 +827,11 @@ void loop() {
     Serial.print(F(" gz="));      Serial.print(g_gz,1); Serial.println(F("dps"));
 
     sendImuBinary(g_ax, g_ay, g_az, g_gx, g_gy, g_gz);
+  }
+
+  // SD log at 50 Hz
+  if (now - lastSdLog >= 20UL) {
+    lastSdLog = now;
     sdLog(now);
   }
 
