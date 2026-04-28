@@ -5,7 +5,7 @@
 
 #include <Adafruit_NeoPixel.h>
 
-static constexpr uint8_t PIN_TRIGGER = 9;
+static constexpr uint8_t PIN_TRIGGER = 25;
 
 // One NeoPixel object per pin
 static constexpr uint8_t LED_PINS[] = { 6, 7, 10, 11 };

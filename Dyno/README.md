@@ -1,291 +1,435 @@
-# Dyno + Raspberry Pi Telemetry Setup Guide
+# Dyno Telemetry — Complete Setup Guide
 
-This repository contains everything needed to collect data from the **Dyno RP2040 CAN node**, push it into **InfluxDB 2.x**, and visualize it with **Grafana** running on a Raspberry Pi. Use this guide to bring the entire system online from a fresh Pi image.
+Full guide for the Dyno RP2040 → InfluxDB → Grafana stack running on Raspberry Pi.
+
+```
+RP2040 (Feather + MCP2515 Wing) ──USB──> Raspberry Pi ──Docker─┬─> InfluxDB 2 (telemetry bucket)
+                                                                └─> Grafana (dashboards, WiFi hotspot)
+```
 
 ---
 
-## 1. System Overview
+## Quick Reference
 
-```
-RP2040 (Adafruit Feather CAN) ──USB──> Raspberry Pi ──Docker─┬─> InfluxDB 2 (telemetry bucket)
-                                                             └─> Grafana (dashboards)
-```
-- The **RP2040** streams newline-delimited JSON (NDJSON) packets that contain dyno metrics (RPM, TPS, MAP, battery V, coolant °C, etc.).
-- The **Pi** runs a Python ingester (`Dyno/dyno_ingest_influx.py`) that reads the serial stream and writes fields into InfluxDB 2.x.
-- A Docker Compose stack in `Dyno/stack/` runs **InfluxDB 2** + **Grafana** with persistent volumes and secret-managed credentials.
-- Optional: A `systemd` unit (`Dyno/dyno-ingest.service`) keeps the ingestion script running on boot.
+| | |
+|---|---|
+| **WiFi SSID** | `GrafanaNetwork` |
+| **WiFi password** | `kachow` |
+| **Grafana** | `http://192.168.4.1:3000` |
+| **Grafana login** | `admin` / `fsae2025` |
+| **InfluxDB** | `http://192.168.4.1:8086` |
+| **InfluxDB org** | `yorkracing` |
+| **InfluxDB bucket** | `telemetry` |
 
-Key files:
+---
+
+## Key Files
 
 | Path | Purpose |
-| --- | --- |
-| `Dyno/dyno_ingest_influx.py` | Serial NDJSON → InfluxDB writer (runs on Pi) |
-| `Dyno/dyno_simple.py` | Local plotting helper if you just want to view packets |
-| `Dyno/Dyno_Final.py` | Dash-powered local dashboard with live graphs + raw table |
-| `Dyno/stack/compose.yaml` | Docker stack for InfluxDB 2 + Grafana |
-| `Dyno/stack/README.md` | Detailed stack instructions |
-| `Dyno/README_ingest.md` | Minimal ingest quick start |
-| `Dyno/dyno-ingest.service` | systemd service template |
+|------|---------|
+| `Dyno/dyno_ingest_influx.py` | Serial NDJSON → InfluxDB write loop (runs on Pi) |
+| `Dyno/dyno_simple.py` | Watch serial packets live (debug helper) |
+| `Dyno/Dyno_Final.py` | Local Dash dashboard — no InfluxDB needed |
+| `Dyno/dyno-ingest.service` | systemd unit template |
+| `Dyno/stack/compose.yaml` | Docker stack (InfluxDB 2 + Grafana) |
+| `Dyno/DynoRP2040_MCP2515Wing/` | RP2040 firmware + wiring notes |
 
 ---
 
-## Optional: Local Dash UI (Dyno Final)
+## Step 1 — Hardware Prerequisites
 
-If you just want a sleek local dashboard without standing up Influx + Grafana, run
-`Dyno/Dyno_Final.py`. It talks directly to the RP2040 serial stream and serves a
-Dash/Plotly app (default http://127.0.0.1:8050) featuring multi-series graphs,
-raw-value tables, a dark theme, and live status indicators.
+- Raspberry Pi 3B+ or newer running **Raspberry Pi OS Lite** (64-bit recommended)
+- Pi connected to internet via **Ethernet** for initial setup (wlan0 becomes the hotspot)
+- **Adafruit Feather RP2040** stacked with the **Adafruit FeatherWing MCP2515 CAN** (product 5709)
+- USB cable from Feather to Pi
 
-1. **Install deps (laptop or Pi):**
-   ```bash
-   python -m pip install dash dash-bootstrap-components plotly pyserial
-   ```
-2. **(Optional) set env vars** to override defaults:
-
-   | Variable | Purpose | Default |
-   | --- | --- | --- |
-   | `TELEM_PORT` | Serial path to RP2040 (override auto-detect) | `/dev/serial/by-id/...` |
-   | `TELEM_BAUD` | Baud rate | `921600` |
-   | `TELEM_KEYS` | Comma list of fields to plot/table | `rpm,tps_pct,map_kpa,batt_v,coolant_c` |
-   | `TELEM_WINDOW_S` | Rolling window length | `30` |
-   | `TELEM_FAKE_DATA` | Set `1` to use synthetic data (no hardware needed) | `0` |
-   | `DYNO_APP_HOST` / `DYNO_APP_PORT` | Dash server bind host/port | `127.0.0.1` / `8050` |
-   | `DYNO_APP_THEME` | Any `dash_bootstrap_components.themes.*` name | `CYBORG` |
-
-3. **Run it:**
-   ```bash
-   python Dyno/Dyno_Final.py
-   ```
-4. Open a browser to `http://<host>:<port>` and customize the UI on the fly
-   (choose metrics, toggle raw table, change graph style, or reset buffers).
-
-The fake-data mode is handy when you want to iterate on UI layout without being
-attached to the dyno hardware. Set `TELEM_FAKE_DATA=1` and you'll get a realistic
-sine/saw mix of telemetry fields at ~50 Hz.
+> **Debian (non-Raspberry Pi OS) users:** WiFi firmware is not pre-installed. Run:
+> ```bash
+> sudo apt update && sudo apt install -y firmware-brcm80211
+> echo "brcmfmac" | sudo tee -a /etc/modules
+> sudo reboot
+> ```
+> After reboot, confirm `ip link show wlan0` shows the interface.
 
 ---
 
-## 2. Hardware & OS Prerequisites
+## Step 2 — Flash RP2040 Firmware
 
-1. **Raspberry Pi 4 (4 GB+) or Pi 5** running the latest 64‑bit Raspberry Pi OS Lite.
-2. **32 GB microSD** (A2/U3 recommended) and a stable 5 V / 3 A power supply.
-3. **Network connectivity** (Ethernet preferred for Grafana/Influx access).
-4. **Adafruit Feather RP2040 CAN board** (with MCP2515 CAN controller) flashed with your dyno firmware (see `Dyno/DynoRP204CANHATINtegration/`).
-5. **USB-C cable** to attach the Feather to the Pi.
-6. Dyno sensors wired to the RP2040 inputs so it can populate the fields you expect to log.
+See `Dyno/DynoRP2040_MCP2515Wing/README.md` for full wiring and flashing details.
 
-Optional but recommended:
-- USB hub or extender to physically isolate the Pi from dyno vibration.
-- External SSD if you expect long captures (InfluxDB writes a lot).
+**SPI pinout (Feather RP2040 ↔ MCP2515 wing):**
 
----
+| Function | RP2040 Pin | Wing Pad |
+|----------|-----------|---------|
+| SPI1 MISO | GP8 / D22 | DO |
+| SPI1 MOSI | GP15 / D23 | DI |
+| SPI1 SCK | GP14 / D24 | SCK |
+| MCP2515 CS | GP5 / D5 | CS |
 
-## 3. Prepare the Raspberry Pi
-
-Perform these steps after flashing Raspberry Pi OS Lite.
-
-```bash
-# Log in (SSH or local) as the default user, then:
-sudo raspi-config  # enable SSH, set locale/timezone if needed
-sudo apt update && sudo apt full-upgrade -y
-sudo apt install -y git python3 python3-pip docker.io docker-compose-plugin
-sudo usermod -aG docker $USER   # allows current user to run docker without sudo
-newgrp docker                    # refresh group membership in current shell
+Flash `DynoRP2040_MCP2515Wing.ino` via Arduino IDE (board: `Adafruit Feather RP2040`, baud: 115200). On success you'll see:
+```
+# MCP2515 init 500k/16MHz => OK
 ```
 
-Clone the repository (adjust path if you prefer a different location):
+---
 
+## Step 3 — Prepare the Pi
+
+```bash
+sudo apt update && sudo apt full-upgrade -y
+sudo apt install -y git python3 python3-pip
+```
+
+Clone the repo:
 ```bash
 cd ~
 git clone https://github.com/JacksonHarvey1/FSAE2025.git
-cd FSAE2025/Dyno
 ```
 
-> ⚠️ If you cloned via SSH, make sure your deploy key has read access to GitHub.
+---
+
+## Step 4 — Install Docker
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+docker version
+docker compose version
+```
+
+If `compose version` fails:
+```bash
+sudo apt install -y docker-compose-plugin
+```
 
 ---
 
-## 4. Configure the Telemetry Stack (InfluxDB + Grafana)
+## Step 5 — Configure Secrets
 
-All stack assets live in `Dyno/stack/`.
+```bash
+cd ~/FSAE2025/Dyno/stack
+mkdir -p secrets
 
-1. **Create real secret files** (remove the `.example` suffix and set your own credentials):
+cp secrets/influxdb2-admin-username.example secrets/influxdb2-admin-username
+cp secrets/influxdb2-admin-password.example secrets/influxdb2-admin-password
+cp secrets/influxdb2-admin-token.example    secrets/influxdb2-admin-token
 
-    ```bash
-    cd ~/FSAE2025/Dyno/stack
-    mkdir -p secrets
-    cp secrets/influxdb2-admin-username.example secrets/influxdb2-admin-username
-    cp secrets/influxdb2-admin-password.example secrets/influxdb2-admin-password
-    cp secrets/influxdb2-admin-token.example secrets/influxdb2-admin-token
+# Edit each file — one value per file, no trailing newline
+nano secrets/influxdb2-admin-username   # e.g. admin
+nano secrets/influxdb2-admin-password   # e.g. fsae2025
+nano secrets/influxdb2-admin-token      # e.g. my-super-secret-token
 
-    nano secrets/influxdb2-admin-username   # e.g., admin
-    nano secrets/influxdb2-admin-password   # choose a strong password
-    nano secrets/influxdb2-admin-token      # generate a long random string
-    chmod 600 secrets/influxdb2-admin-*
-    ```
-
-2. **Start the stack** (InfluxDB on :8086, Grafana on :3000):
-
-    ```bash
-    cd ~/FSAE2025/Dyno/stack
-    docker compose up -d
-    docker compose ps
-    ```
-
-    - Use `./start.sh` and `./stop.sh` as shortcuts once they are marked executable.
-    - View Influx logs: `docker compose logs -f influxdb2`.
-
-3. **Initial logins**:
-
-    - InfluxDB UI: `http://<pi-ip>:8086`
-      - Organization: `yorkracing`
-      - Bucket: `telemetry`
-      - Token: contents of `secrets/influxdb2-admin-token`
-    - Grafana UI: `http://<pi-ip>:3000`
-      - Username: `admin`
-      - Password: set via `GF_SECURITY_ADMIN_PASSWORD` in `compose.yaml` (default `ChangeMe_Once`).
-      - Change the password immediately after first login.
-
-4. **Add an InfluxDB datasource in Grafana** (once logged in):
-
-    - Type: **InfluxDB**
-    - URL: `http://influxdb2:8086`
-    - Query language: **Flux**
-    - Organization: `yorkracing`
-    - Bucket: `telemetry`
-    - Token: paste the admin token (or create a read-only token via the Influx UI).
-
-> 📌 If you ever wipe the Docker volumes (`docker compose down -v`), you must recreate the secrets and rerun setup. Tokens will change!
+chmod 600 secrets/influxdb2-admin-*
+```
 
 ---
 
-## 5. Connect the RP2040 Dyno Node
+## Step 6 — Start the Docker Stack
 
-1. **Flash firmware**: build/flash the sketch in `Dyno/DynoRP204CANHATINtegration/` using the Arduino IDE or `arduino-cli`.
-2. **Wire sensors**: make sure RPM, TPS, MAP, battery voltage, and coolant temp sensors are wired to the channels expected by the firmware. The NDJSON packets must contain the keys you plan to ingest (default: `rpm,tps_pct,map_kpa,batt_v,coolant_c`).
-3. **Attach to the Pi**: connect the Feather to the Pi via USB. Verify the serial path:
+```bash
+cd ~/FSAE2025/Dyno/stack
+docker compose up -d
+docker compose ps
+```
 
-    ```bash
-    ls /dev/serial/by-id
-    # Example: /dev/serial/by-id/usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00
-    ```
+Both `influxdb2` and `grafana` should show `running`. Verify Grafana (while on Ethernet):
+```bash
+curl -s http://localhost:3000/api/health | grep ok
+```
 
-    Use this exact path for `TELEM_PORT`.
-
----
-
-## 6. Run the Python Ingest Script
-
-1. **Install dependencies** (on the Pi):
-
-    ```bash
-    python3 -m pip install --upgrade pip
-    python3 -m pip install --upgrade pyserial influxdb-client
-    ```
-
-2. **Export the required environment variables** (adjust paths as needed):
-
-    ```bash
-    cd ~/FSAE2025
-
-    export INFLUX_URL="http://localhost:8086"
-    export INFLUX_ORG="yorkracing"
-    export INFLUX_BUCKET="telemetry"
-    export INFLUX_TOKEN_FILE="$HOME/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token"
-
-    # TELEM_PORT left unset => Dyno_Final.py auto-detects the Feather via /dev/serial/by-id
-    export TELEM_BAUD="921600"
-
-    export TELEM_SYSTEM="dyno"     # Influx tag
-    export TELEM_NODE="rp2040"      # Influx tag
-    export TELEM_KEYS="rpm,tps_pct,map_kpa,batt_v,coolant_c"
-    ```
-
-3. **Run the ingester**:
-
-    ```bash
-    python3 Dyno/dyno_ingest_influx.py
-    ```
-
-    A healthy loop prints something like:
-
-    ```
-    [serial] connected /dev/serial/... @ 921600
-    [ingest] 120.5 pts/sec -> telemetry (dyno/rp2040) @ http://localhost:8086
-    ```
-
-4. **Sanity check**:
-
-    - In the InfluxDB UI, query the `telemetry` bucket and confirm new points arrive.
-    - In Grafana, build a quick panel that graphs `rpm` over time using Flux: `from(bucket: "telemetry") |> range(start: -5m)` etc.
-
-> Tip: Use `Dyno/dyno_simple.py` if you just want to watch packets live while debugging sensors.
+Enable Docker to start on boot:
+```bash
+sudo systemctl enable docker
+```
 
 ---
 
-## 7. Run on Boot with systemd (optional but recommended)
+## Step 7 — Install Python Dependencies
 
-1. **Customize the service file**:
+```bash
+sudo pip3 install influxdb-client pyserial
+```
 
-    ```bash
-    cp ~/FSAE2025/Dyno/dyno-ingest.service ~/FSAE2025/Dyno/dyno-ingest.service.local
-    nano ~/FSAE2025/Dyno/dyno-ingest.service.local
-    ```
-
-    Update at least:
-    - `User=` → your Pi username.
-    - `WorkingDirectory=` and paths → e.g., `/home/<user>/FSAE2025`.
-    - `TELEM_PORT=` if your serial device path differs.
-
-2. **Install and enable**:
-
-    ```bash
-    sudo cp ~/FSAE2025/Dyno/dyno-ingest.service.local /etc/systemd/system/dyno-ingest.service
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now dyno-ingest
-    sudo journalctl -u dyno-ingest -f   # tail logs
-    ```
-
-    The service restarts automatically if the serial link drops or Influx is temporarily unavailable.
+> **Pi OS Bookworm:** If pip complains about "externally managed environment":
+> ```bash
+> sudo pip3 install influxdb-client pyserial --break-system-packages
+> ```
 
 ---
 
-## 8. Validation Checklist
+## Step 8 — Configure the systemd Ingest Service
 
-- [ ] `docker compose ps` shows `influxdb2` and `grafana` as `running`.
-- [ ] `curl http://localhost:8086/health` returns `pass`.
-- [ ] `python3 Dyno/dyno_ingest_influx.py` prints packet throughput without errors.
-- [ ] InfluxDB bucket `telemetry` is receiving new points (verify via UI or `influx` CLI).
-- [ ] Grafana dashboards display live data sourced from InfluxDB.
-- [ ] `sudo systemctl status dyno-ingest` shows `active (running)` if you enabled the service.
+Edit the service file and replace `YOUR_USERNAME` with your Pi username (`whoami` to check):
+
+```bash
+nano ~/FSAE2025/Dyno/dyno-ingest.service
+```
+
+```ini
+[Unit]
+Description=Dyno telemetry ingest (serial NDJSON -> InfluxDB)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/FSAE2025
+
+Environment=INFLUX_URL=http://localhost:8086
+Environment=INFLUX_ORG=yorkracing
+Environment=INFLUX_BUCKET=telemetry
+Environment=INFLUX_TOKEN_FILE=/home/YOUR_USERNAME/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token
+
+Environment=TELEM_PORT=/dev/ttyACM0
+Environment=TELEM_BAUD=115200
+Environment=TELEM_SYSTEM=dyno
+Environment=TELEM_NODE=rp2040
+Environment=TELEM_KEYS=rpm,veh_kph,tps_pct,ign_deg,map_kpa,map_ext_kpa,lambda1,lambda2,batt_v,coolant_c,oil_temp_c,air_c,gear,fuel_psi,oil_psi,inj_ms,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,rssi
+
+ExecStart=/usr/bin/python3 /home/YOUR_USERNAME/FSAE2025/Dyno/dyno_ingest_influx.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Install and enable:
+```bash
+sudo cp ~/FSAE2025/Dyno/dyno-ingest.service /etc/systemd/system/dyno-ingest.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now dyno-ingest
+sudo systemctl status dyno-ingest
+```
+
+Should show `active (running)`. Follow live logs:
+```bash
+sudo journalctl -u dyno-ingest -f
+```
 
 ---
 
-## 9. Troubleshooting Tips
+## Step 9 — Configure Grafana Datasource
 
-| Symptom | Likely Cause | Fix |
-| --- | --- | --- |
-| `serial open failed` loops forever | Wrong `TELEM_PORT` or board not detected | Re-check `ls /dev/serial/by-id`, confirm USB cable, permissions |
-| `Missing INFLUX_TOKEN or INFLUX_TOKEN_FILE` | Token file path/env not set | Export `INFLUX_TOKEN_FILE` or set `INFLUX_TOKEN` directly |
-| Grafana shows no data | Datasource misconfigured | Ensure Flux datasource uses the correct org/bucket/token |
-| Influx rejects writes | Token lacks write perms or bucket missing | Recreate token, confirm bucket `telemetry` exists |
-| systemd unit fails | Wrong paths/user env | Edit `dyno-ingest.service` to match your username and repo path |
-| Need to reinitialize Influx | Corrupted volumes | `docker compose down -v`, recreate secrets, rerun `docker compose up -d` |
+1. Open `http://<pi-ip>:3000`, login `admin` / `fsae2025`
+2. Go to **Connections → Data Sources → Add data source → InfluxDB**
+3. Set:
+
+   | Setting | Value |
+   |---------|-------|
+   | **URL** | `http://influxdb2:8086` |
+   | **Query Language** | Flux |
+   | **Organization** | `yorkracing` |
+   | **Default Bucket** | `telemetry` |
+   | **Token** | contents of `Dyno/stack/secrets/influxdb2-admin-token` |
+
+4. Click **Save & test** — should say "datasource is working"
+
+> **Critical:** Use `http://influxdb2:8086`, not `http://localhost:8086`. Grafana runs inside Docker — `localhost` would point to the Grafana container, not InfluxDB.
+
+Get your token if needed:
+```bash
+cat ~/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token
+# or from the running container:
+cd ~/FSAE2025/Dyno/stack && docker compose exec influxdb2 influx auth list
+```
 
 ---
 
-## 10. Where to Go Next
+## Step 10 — WiFi Hotspot
 
-- Customize `TELEM_KEYS` to match any new fields emitted by the RP2040.
-- Create a read-only Influx token for Grafana dashboards shared with teammates.
-- Use Grafana alerting to notify when RPM or temp exceeds safe limits.
-- Back up the `influxdb2-data` and `grafana-data` volumes periodically if you rely on historical traces.
+> This converts `wlan0` into an access point. The Pi will **lose WiFi client access** after this step. Use Ethernet for internet going forward.
 
-With these steps complete, the Raspberry Pi should boot into a fully functional dyno telemetry stack that automatically ingests RP2040 data and serves it to Grafana in real time.
+Check which network manager is active:
+```bash
+systemctl is-active NetworkManager   # Debian / Pi OS Bookworm+
+systemctl is-active dhcpcd           # older Pi OS Bullseye and below
+```
 
+### Method A — NetworkManager (Pi OS Bookworm+)
 
+```bash
+sudo nmcli con add type wifi ifname wlan0 con-name GrafanaNetwork autoconnect yes ssid GrafanaNetwork
+sudo nmcli con modify GrafanaNetwork 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared
+sudo nmcli con modify GrafanaNetwork wifi-sec.key-mgmt wpa-psk wifi-sec.psk kachow
+sudo nmcli con modify GrafanaNetwork ipv4.addresses 192.168.4.1/24
+sudo nmcli con up GrafanaNetwork
+```
+
+Verify:
+```bash
+ip addr show wlan0            # should show 192.168.4.1
+nmcli con show GrafanaNetwork # autoconnect should be yes
+```
+
+### Method B — dhcpcd + hostapd (Pi OS Bullseye and older)
+
+Only use if `dhcpcd` is active and `NetworkManager` is inactive.
+
+```bash
+sudo nano /etc/dhcpcd.conf
+```
+Add at the bottom:
+```
+interface wlan0
+    static ip_address=192.168.4.1/24
+    nohook wpa_supplicant
+```
+
+```bash
+sudo apt install -y hostapd dnsmasq
+sudo nano /etc/dnsmasq.conf
+```
+Add:
+```
+interface=wlan0
+dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+```
+
+```bash
+sudo nano /etc/hostapd/hostapd.conf
+```
+```
+interface=wlan0
+driver=nl80211
+ssid=GrafanaNetwork
+hw_mode=g
+channel=7
+wpa=2
+wpa_passphrase=kachow
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+```
+
+```bash
+sudo nano /etc/default/hostapd
+# Set: DAEMON_CONF="/etc/hostapd/hostapd.conf"
+
+sudo systemctl unmask hostapd
+sudo systemctl enable hostapd dnsmasq
+sudo reboot
+```
+
+---
+
+## Step 11 — Verify After Reboot
+
+```bash
+# Docker stack
+cd ~/FSAE2025/Dyno/stack && docker compose ps
+
+# Ingest service
+sudo systemctl status dyno-ingest
+sudo journalctl -u dyno-ingest -n 20
+
+# Hotspot (if using hostapd)
+sudo systemctl status hostapd dnsmasq
+```
+
+Connect a phone to `GrafanaNetwork` (password `kachow`) and open `http://192.168.4.1:3000`.
+
+---
+
+## Dashboard Panels — Example Flux Queries
+
+### RPM Time Series
+```flux
+from(bucket: "telemetry")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "telemetry")
+  |> filter(fn: (r) => r._field == "rpm")
+  |> filter(fn: (r) => r.system == "dyno" and r.node == "rp2040")
+  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
+```
+
+Replace `"rpm"` with any field: `tps_pct`, `map_kpa`, `coolant_c`, `batt_v`, `lambda1`, etc.
+
+### RPM Gauge (current value)
+```flux
+from(bucket: "telemetry")
+  |> range(start: -5m)
+  |> filter(fn: (r) => r._measurement == "telemetry")
+  |> filter(fn: (r) => r._field == "rpm")
+  |> last()
+```
+
+**Recommended first layout:** RPM gauge + TPS stat + battery stat on top row; RPM time series wide in the middle; MAP, coolant, lambda on the bottom. Set dashboard auto-refresh to 1s–2s.
+
+---
+
+## Optional — Local Dash UI (Dyno_Final.py)
+
+No InfluxDB needed — reads directly from serial and serves a Plotly dashboard at `http://localhost:8050`.
+
+```bash
 python3 -m venv ~/dash_venv
 source ~/dash_venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install dash dash-bootstrap-components plotly
-python -c "import dash, dash_bootstrap_components as dbc; import plotly.graph_objects as go; print('ok')"
+pip install dash dash-bootstrap-components plotly pyserial
+python Dyno/Dyno_Final.py
+```
+
+Pi performance tips — set these before running:
+```bash
+export TELEM_KEYS="rpm,tps_pct,map_kpa,batt_v,coolant_c,air_c"  # 6 fields, not 50+
+export DYNO_APP_REFRESH_MS=1000                                   # 1 Hz, not 5 Hz
+```
+
+Fake data mode (no hardware):
+```bash
+export TELEM_FAKE_DATA=1
+python Dyno/Dyno_Final.py
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `dyno-ingest` fails — `ModuleNotFoundError: No module named 'influxdb_client'` | Python package not installed | `sudo pip3 install influxdb-client` (add `--break-system-packages` on Bookworm) |
+| `dyno-ingest` fails immediately | Wrong `TELEM_PORT` or Feather not plugged in | `ls /dev/ttyACM*` — set matching port in service file; `sudo systemctl daemon-reload && sudo systemctl restart dyno-ingest` |
+| Grafana datasource — "connection refused" on port 8086 | Using `localhost` instead of Docker service name | Change URL to `http://influxdb2:8086` |
+| Grafana datasource — "Unauthorized" reading buckets | Wrong or missing token | `cat ~/FSAE2025/Dyno/stack/secrets/influxdb2-admin-token` and paste exactly into the Token field |
+| Token file contents don't work | Volume wiped and re-initialized (new token generated) | `cd ~/FSAE2025/Dyno/stack && docker compose exec influxdb2 influx auth list` — copy token from there and update the secrets file |
+| No data in Grafana panels | Ingest not running or wrong field name | Confirm `sudo systemctl status dyno-ingest`, check field names are exact lowercase |
+| `hostapd` fails to start | Config error | `sudo hostapd /etc/hostapd/hostapd.conf` to see raw error |
+| Phones connect but can't reach Grafana | Docker stack down | `cd ~/FSAE2025/Dyno/stack && docker compose up -d` |
+| No IP assigned to phones | dnsmasq issue | `sudo journalctl -u dnsmasq -n 50` |
+| InfluxDB won't init (volume already exists) | Volume not wiped | `cd ~/FSAE2025/Dyno/stack && docker compose down -v` then recreate secrets and rerun `docker compose up -d` |
+| Pi browser shows "Insufficient Resources" in Dyno_Final.py | Too many graphs at high refresh | Reduce `TELEM_KEYS` to 6 fields, set `DYNO_APP_REFRESH_MS=1000` |
+| `MCP2515 init => FAIL` on RP2040 | CS pin wrong or wing not seated | Re-seat wing, confirm CS is GP5, check solder joints |
+| JSON never prints from RP2040 | No CAN frames seen | Verify PE3 ECU is powered, CAN bus is 500 kbps, IDs 0x770–0x790 |
+
+---
+
+## Daily Operations
+
+```bash
+# Start everything
+cd ~/FSAE2025/Dyno/stack && docker compose up -d
+sudo systemctl start dyno-ingest
+
+# Stop everything
+sudo systemctl stop dyno-ingest
+cd ~/FSAE2025/Dyno/stack && docker compose down
+
+# View ingest logs
+sudo journalctl -u dyno-ingest -f
+
+# View Docker logs
+cd ~/FSAE2025/Dyno/stack && docker compose logs -f
+```
+
+---
+
+## Validation Checklist
+
+- [ ] `docker compose ps` shows `influxdb2` and `grafana` as `running`
+- [ ] `curl http://localhost:8086/health` returns `"status":"pass"`
+- [ ] `sudo systemctl status dyno-ingest` shows `active (running)`
+- [ ] Grafana datasource test passes ("datasource is working")
+- [ ] Data visible in InfluxDB Data Explorer (bucket: `telemetry`)
+- [ ] Grafana dashboard panels show live data
+- [ ] Phone connects to `GrafanaNetwork` and reaches `http://192.168.4.1:3000`

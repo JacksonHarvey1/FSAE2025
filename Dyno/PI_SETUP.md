@@ -77,6 +77,10 @@ nano secrets/influxdb2-admin-password   # e.g. fsae2025
 nano secrets/influxdb2-admin-token      # e.g. my-super-secret-token
 
 chmod 600 secrets/influxdb2-admin-*
+
+Be sure to install influxdb-client
+sudo apt install python3-influxdb-client
+
 ```
 
 ---
@@ -85,8 +89,8 @@ chmod 600 secrets/influxdb2-admin-*
 
 ```bash
 cd ~/FSAE2025/Dyno/stack
-docker compose up -d
-docker compose ps
+sudo docker compose up -d
+sudo docker compose ps
 ```
 
 Both `influxdb2` and `grafana` should show `running`. Check Grafana is reachable (while still on Ethernet):
@@ -269,6 +273,10 @@ sudo reboot
 ```
 
 ---
+
+### Method C
+Go to adanced options in network settings and create a hotspot
+
 
 ## Step 7 — Verify after reboot
 
