@@ -47,14 +47,14 @@ static constexpr uint8_t LED_RED = PIN_LED;
 #define LEDS_PER_PIN 1
 
 static constexpr uint8_t PIN_LED_ENG_WARN  = 7;   // moved from 5 — pin 5 is CAN FeatherWing CS
-static constexpr uint8_t PIN_LED_OIL_WARN  = 6;
-static constexpr uint8_t PIN_LED_SHIFT      = 9;
+static constexpr uint8_t PIN_LED_OIL_WARN  = 11;
+static constexpr uint8_t PIN_LED_SHIFT      = 6;
 static constexpr uint8_t PIN_LED_FUEL_WARN = 10;
-static constexpr uint8_t PIN_LED_NEUTRAL   = 11;
+static constexpr uint8_t PIN_LED_NEUTRAL   = 9;
 
 // Neutral switch input — wire neutral position sensor/switch to this pin and GND
 // INPUT_PULLUP: LOW = neutral, HIGH = in gear
-static constexpr uint8_t PIN_NEUTRAL_SWITCH = 4;
+static constexpr uint8_t PIN_NEUTRAL_SWITCH = 12;
 
 // Warning thresholds — tune as needed
 static constexpr float    CLT_WARN_F      = 200.0f;  // coolant temp warning (°F)
@@ -169,7 +169,8 @@ static constexpr uint8_t GEAR_CONFIRM  = 4;
 //  IMU (LSM6DSOX via I2C, address 0x6A)
 // =====================================================================
 static constexpr uint8_t  IMU_ADDR      = 0x6A;
-static constexpr uint32_t IMU_PERIOD_MS = 10;   // 100 Hz
+static constexpr uint32_t IMU_PERIOD_MS  = 10;   // 100 Hz sample rate
+static constexpr uint32_t IMU_LORA_MS   = 100;  // 10 Hz LoRa transmit rate — LoRa time-on-air ~50ms/pkt so 100Hz saturates the link and starves CAN row frames (coolant/oil only appear in specific rows)
 static constexpr float    G0            = 9.80665f;
 static constexpr float    RAD2DEG       = 57.295779513f;
 
@@ -283,6 +284,7 @@ Adafruit_LSM6DSOX imu;
 bool     g_imuOk  = false;
 float    g_gbx=0, g_gby=0, g_gbz=0;
 uint32_t lastImuSend = 0;
+uint32_t lastImuTx   = 0;
 uint32_t g_imuSeq   = 0;
 float    g_ax=0, g_ay=0, g_az=1.0f;
 float    g_gx=0, g_gy=0, g_gz=0;
@@ -807,7 +809,7 @@ void loop() {
     Serial.println();
   }
 
-  // IMU sample + LoRa send at 100 Hz, SD log
+  // IMU sample at 100 Hz (for SD log accuracy)
   if (g_imuOk && (now - lastImuSend >= IMU_PERIOD_MS)) {
     lastImuSend = now;
     sensors_event_t a, g, tmp;
@@ -818,14 +820,12 @@ void loop() {
     g_gx = g.gyro.x * RAD2DEG - g_gbx;
     g_gy = g.gyro.y * RAD2DEG - g_gby;
     g_gz = g.gyro.z * RAD2DEG - g_gbz;
+  }
 
-    Serial.print(F("[IMU] ax=")); Serial.print(g_ax,3);
-    Serial.print(F(" ay="));      Serial.print(g_ay,3);
-    Serial.print(F(" az="));      Serial.print(g_az,3);
-    Serial.print(F("g  gx="));    Serial.print(g_gx,1);
-    Serial.print(F(" gy="));      Serial.print(g_gy,1);
-    Serial.print(F(" gz="));      Serial.print(g_gz,1); Serial.println(F("dps"));
-
+  // IMU LoRa transmit at 10 Hz — decoupled from sample rate to avoid saturating
+  // the link (each waitPacketSent() blocks ~50ms; 100Hz = link always busy)
+  if (g_imuOk && (now - lastImuTx >= IMU_LORA_MS)) {
+    lastImuTx = now;
     sendImuBinary(g_ax, g_ay, g_az, g_gx, g_gy, g_gz);
   }
 

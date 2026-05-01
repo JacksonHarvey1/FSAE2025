@@ -145,6 +145,10 @@ void emitJson() {
   if (isnan(g_snap.air_c)) Serial.print(F("null"));
   else Serial.print(g_snap.air_c, 1);
 
+  Serial.print(F(",\"oil_temp_c\":"));
+  if (isnan(g_snap.oil_temp_c)) Serial.print(F("null"));
+  else Serial.print(g_snap.oil_temp_c, 1);
+
   Serial.print(F(",\"ign_deg\":"));  Serial.print(g_snap.ign_deg, 2);
   Serial.print(F(",\"veh_kph\":"));  Serial.print(g_snap.veh_kph, 2);
   Serial.print(F(",\"lambda1\":")); Serial.print(g_snap.lambda1, 3);

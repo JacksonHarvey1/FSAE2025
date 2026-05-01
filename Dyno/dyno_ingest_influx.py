@@ -30,7 +30,7 @@ import time
 from typing import Any, Dict, Optional
 
 import serial
-from influxdb_client import InfluxDBClient, Point
+from influxdb_client import InfluxDBClient, Point, WriteOptions
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 
@@ -173,7 +173,9 @@ def main() -> None:
     
     print(f"[influx] Connecting to {INFLUX_URL}...")
     influx = InfluxDBClient(url=INFLUX_URL, token=token, org=INFLUX_ORG)
-    write_api = influx.write_api(write_options=SYNCHRONOUS)
+    # Batch writes: flush every 500ms or 50 points — avoids blocking the serial
+    # read loop on every InfluxDB round-trip (was SYNCHRONOUS = one blocking call/point)
+    write_api = influx.write_api(write_options=WriteOptions(batch_size=50, flush_interval=500))
     print("[influx] Connected successfully")
     print()
 
