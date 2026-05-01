@@ -1,11 +1,30 @@
-jackson@Jackson1:~/FSAE2025/pit_telemetry/backend $ sudo lsof /dev/ttyACM0
+ycracing@YCRacing:~ $ sudo lsof /dev/ttyACM0
+[sudo] password for ycracing: 
 lsof: WARNING: can't stat() fuse.gvfsd-fuse file system /run/user/1000/gvfs
       Output information may be incomplete.
 lsof: WARNING: can't stat() fuse.portal file system /run/user/1000/doc
       Output information may be incomplete.
+COMMAND  PID     USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+python3  695 ycracing 3u   CHR  166,0      0t0  601 /dev/ttyACM0
+python3 2098 ycracing 3u   CHR  166,0      0t0  601 /dev/ttyACM0
+ycracing@YCRacing:~ $ sudo fuser /dev/ttyACM0
+/dev/ttyACM0:          695  2098
+ycracing@YCRacing:~ $ systemctl1 status dyno-ingest.service
+bash: systemctl1: command not found
+ycracing@YCRacing:~ $ systemctl status dyno-ingest.service
+● dyno-ingest.service - Dyno telemetry ingest (serial NDJSON -> InfluxDB)
+     Loaded: loaded (/etc/systemd/system/dyno-ingest.service; enabled; preset: >
+     Active: active (running) since Thu 2026-04-30 21:13:54 EDT; 1min 59s ago
+ Invocation: 6f1f2b496ea4458c8b28e41230c88b9d
+   Main PID: 2098 (python3)
+      Tasks: 2 (limit: 2303)
+        CPU: 467ms
+     CGroup: /system.slice/dyno-ingest.service
+             └─2098 /usr/bin/python3 /home/ycracing/FSAE2025/Dyno/dyno_ingest_i>
 
+Apr 30 21:13:54 YCRacing systemd[1]: Started dyno-ingest.service - Dyno telemet>
 
-jackson@Jackson1:~ $ sudo fuser -v /dev/ttyACM0
-jackson@Jackson1:~ $ ls -l /dev/serial/by-id/
-total 0
-lrwxrwxrwx 1 root root 13 Dec 27 19:55 usb-Adafruit_Feather_RP2040_CAN_DF641455DB3F1327-if00 -> ../../ttyACM0
+ycracing@YCRacing:~ $ ps aux | grep python
+ycracing     695  0.3  2.4 145776 50768 ?        Ssl  21:13   0:00 /usr/bin/python3 /home/ycracing/FSAE2025/Dyno/dyno_ingest_influx.py
+ycracing    2098  0.3  2.4 145792 50896 ?        Ssl  21:13   0:00 /usr/bin/python3 /home/ycracing/FSAE2025/Dyno/dyno_ingest_influx.py
+ycracing    2266  0.0  0.1   6384  2112 pts/0    S+   21:16   0:00 grep --color=auto python
