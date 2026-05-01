@@ -120,7 +120,7 @@ def open_serial_forever() -> serial.Serial:
     """Open serial port, retrying forever."""
     while True:
         try:
-            ser = serial.Serial(PORT, BAUD, timeout=None)  # block until newline
+            ser = serial.Serial(PORT, BAUD, timeout=None, exclusive=True)  # exclusive prevents two instances silently sharing the port and corrupting data
             try:
                 ser.reset_input_buffer()
             except Exception:
