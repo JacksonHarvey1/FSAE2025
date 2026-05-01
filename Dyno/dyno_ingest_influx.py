@@ -224,6 +224,9 @@ def main() -> None:
 
         pkt = obj.get("pkt")
         is_imu = obj.get("t") == "imu"
+        tps    = obj.get("tps_pct")
+        ts     = time.strftime("%H:%M:%S") + f".{int(time.time() * 1000) % 1000:03d}"
+
         if is_imu:
             if pkt is not None and pkt == last_pkt_imu:
                 lines_deduped += 1
@@ -234,6 +237,9 @@ def main() -> None:
                 lines_deduped += 1
                 continue
             last_pkt_bosch = pkt
+            # print every unique Bosch packet so we can see TPS in real time
+            read_ms = (t_read_end - t_read_start) * 1000
+            print(f"[rx] {ts}  pkt={pkt}  tps={tps}  rpm={obj.get('rpm')}  read={read_ms:.0f}ms")
 
         point = make_point(obj)
         if point is None:
@@ -246,12 +252,12 @@ def main() -> None:
             write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
             count += 1
         except Exception as e:
-            print(f"[influx] write failed: {e}")
+            print(f"[influx write error] {e}")
         t_write_end = time.time()
 
         write_ms = (t_write_end - t_write_start) * 1000
-        if write_ms > 200:
-            print(f"[SLOW WRITE] {write_ms:.0f}ms  pkt={pkt}  tps={obj.get('tps_pct')}  rpm={obj.get('rpm')}")
+        if write_ms > 50:
+            print(f"[SLOW WRITE] {write_ms:.0f}ms  pkt={pkt}  tps={tps}")
 
         # health print every 5s
         now = time.time()
