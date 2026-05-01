@@ -30,7 +30,7 @@ import time
 from typing import Any, Dict, Optional
 
 import serial
-from influxdb_client import InfluxDBClient, Point, WriteOptions
+from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 
@@ -173,15 +173,14 @@ def main() -> None:
     
     print(f"[influx] Connecting to {INFLUX_URL}...")
     influx = InfluxDBClient(url=INFLUX_URL, token=token, org=INFLUX_ORG)
-    # Batch writes: flush every 500ms or 50 points — avoids blocking the serial
-    # read loop on every InfluxDB round-trip (was SYNCHRONOUS = one blocking call/point)
-    write_api = influx.write_api(write_options=WriteOptions(batch_size=50, flush_interval=500))
+    write_api = influx.write_api(write_options=SYNCHRONOUS)
     print("[influx] Connected successfully")
     print()
 
     ser = open_serial_forever()
 
-    last_pkt = None
+    last_pkt_bosch = None
+    last_pkt_imu   = None
     last_rate_t = time.time()
     count = 0
 
@@ -216,9 +215,15 @@ def main() -> None:
             continue
 
         pkt = obj.get("pkt")
-        if pkt is not None and pkt == last_pkt:
-            continue
-        last_pkt = pkt
+        is_imu = obj.get("t") == "imu"
+        if is_imu:
+            if pkt is not None and pkt == last_pkt_imu:
+                continue
+            last_pkt_imu = pkt
+        else:
+            if pkt is not None and pkt == last_pkt_bosch:
+                continue
+            last_pkt_bosch = pkt
 
         point = make_point(obj)
         if point is not None:
