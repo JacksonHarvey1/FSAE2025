@@ -181,10 +181,14 @@ def main() -> None:
 
     last_pkt_bosch = None
     last_pkt_imu   = None
-    last_rate_t = time.time()
-    count = 0
+    last_rate_t   = time.time()
+    count         = 0
+    lines_rx      = 0   # every line received from serial
+    lines_deduped = 0   # skipped by dedup
+    lines_nopoint = 0   # parsed ok but make_point returned None
 
     while True:
+        t_read_start = time.time()
         try:
             raw = ser.read_until(b"\n")
         except Exception as e:
@@ -196,6 +200,7 @@ def main() -> None:
             time.sleep(0.5)
             ser = open_serial_forever()
             continue
+        t_read_end = time.time()
 
         if not raw:
             continue
@@ -206,7 +211,10 @@ def main() -> None:
         if line.startswith("#") or line.startswith("DBG"):
             continue
         if not line.startswith("{"):
+            print(f"[skip non-json] {line[:80]}")
             continue
+
+        lines_rx += 1
 
         try:
             obj: Dict[str, Any] = json.loads(line)
@@ -218,30 +226,49 @@ def main() -> None:
         is_imu = obj.get("t") == "imu"
         if is_imu:
             if pkt is not None and pkt == last_pkt_imu:
+                lines_deduped += 1
                 continue
             last_pkt_imu = pkt
         else:
             if pkt is not None and pkt == last_pkt_bosch:
+                lines_deduped += 1
                 continue
             last_pkt_bosch = pkt
 
         point = make_point(obj)
-        if point is not None:
-            try:
-                write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
-                count += 1
-            except Exception as e:
-                print(f"[influx] write failed: {e}")
+        if point is None:
+            lines_nopoint += 1
+            print(f"[no-point] keys in obj: {list(obj.keys())}")
+            continue
 
-        # health print every ~2s
+        t_write_start = time.time()
+        try:
+            write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
+            count += 1
+        except Exception as e:
+            print(f"[influx] write failed: {e}")
+        t_write_end = time.time()
+
+        write_ms = (t_write_end - t_write_start) * 1000
+        if write_ms > 200:
+            print(f"[SLOW WRITE] {write_ms:.0f}ms  pkt={pkt}  tps={obj.get('tps_pct')}  rpm={obj.get('rpm')}")
+
+        # health print every 5s
         now = time.time()
-        if now - last_rate_t >= 2.0:
-            rate = count / (now - last_rate_t)
+        if now - last_rate_t >= 5.0:
+            elapsed = now - last_rate_t
+            rate = count / elapsed
+            read_ms = (t_read_end - t_read_start) * 1000
             print(
-                f"[ingest] {rate:.1f} pts/sec -> {INFLUX_BUCKET} "
-                f"({TAG_SYSTEM}/{TAG_NODE}) @ {INFLUX_URL}"
+                f"[ingest] {rate:.1f} pts/sec written | "
+                f"rx={lines_rx} deduped={lines_deduped} nopoint={lines_nopoint} | "
+                f"last serial read={read_ms:.0f}ms last write={write_ms:.0f}ms | "
+                f"tps={obj.get('tps_pct')} rpm={obj.get('rpm')}"
             )
             count = 0
+            lines_rx = 0
+            lines_deduped = 0
+            lines_nopoint = 0
             last_rate_t = now
 
 
