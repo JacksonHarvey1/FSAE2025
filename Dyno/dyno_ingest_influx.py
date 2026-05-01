@@ -89,7 +89,7 @@ DEFAULT_KEYS = ",".join([
     # Bosch ECU channels
     "rpm","veh_kph","tps_pct","ign_deg",
     "map_kpa","map_ext_kpa","lambda1","lambda2",
-    "batt_v","coolant_c","oil_temp_c","air_c","gear",
+    "batt_v","coolant_f","oil_temp_f","air_f","gear",
     "fuel_psi","oil_psi","inj_ms",
     # IMU (LSM6DSOX) channels
     "ax_g","ay_g","az_g","gx_dps","gy_dps","gz_dps",

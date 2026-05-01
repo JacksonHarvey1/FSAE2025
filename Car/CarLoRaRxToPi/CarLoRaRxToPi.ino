@@ -40,9 +40,9 @@ struct BoschSnapshot {
   float veh_kph   = 0.0f;
   float tps_pct   = 0.0f;
   float ign_deg   = 0.0f;
-  float coolant_c = NAN;
-  float oil_temp_c = NAN;
-  float air_c     = NAN;   // IAT — key name matches Dyno_Final.py
+  float coolant_f  = NAN;
+  float oil_temp_f = NAN;
+  float air_f      = NAN;   // IAT
   uint8_t gear    = 0;
 
   float map_kpa     = 0.0f;
@@ -91,9 +91,9 @@ void updateSnapshot(uint32_t id, bool ext, uint8_t dlc, const uint8_t *d) {
     g_snap.tps_pct = d[5] * 0.391f;
     g_snap.ign_deg = (int8_t)d[6] * 1.365f;
     if (dlc >= 8) {
-      if (row == 3) g_snap.coolant_c  = d[7] - 40.0f;
-      else if (row == 4) g_snap.oil_temp_c = d[7] - 39.0f;
-      else if (row == 6) g_snap.air_c   = d[7] - 40.0f;
+      if (row == 3) g_snap.coolant_f  = d[7] - 40.0f;                          // ECU encodes in °F
+      else if (row == 4) g_snap.oil_temp_f = (d[7] - 39.0f) * 9.0f/5.0f + 32.0f; // ECU encodes in °C
+      else if (row == 6) g_snap.air_f   = (d[7] - 40.0f) * 9.0f/5.0f + 32.0f;   // ECU encodes in °C
       else if (row == 9) g_snap.gear    = d[7];
     }
   }
@@ -137,17 +137,17 @@ void emitJson() {
   Serial.print(F(",\"map_kpa\":")); Serial.print(g_snap.map_kpa, 2);
   Serial.print(F(",\"batt_v\":")); Serial.print(g_snap.batt_v, 2);
 
-  Serial.print(F(",\"coolant_c\":"));
-  if (isnan(g_snap.coolant_c)) Serial.print(F("null"));
-  else Serial.print(g_snap.coolant_c, 1);
+  Serial.print(F(",\"coolant_f\":"));
+  if (isnan(g_snap.coolant_f)) Serial.print(F("null"));
+  else Serial.print(g_snap.coolant_f, 1);
 
-  Serial.print(F(",\"air_c\":"));
-  if (isnan(g_snap.air_c)) Serial.print(F("null"));
-  else Serial.print(g_snap.air_c, 1);
+  Serial.print(F(",\"air_f\":"));
+  if (isnan(g_snap.air_f)) Serial.print(F("null"));
+  else Serial.print(g_snap.air_f, 1);
 
-  Serial.print(F(",\"oil_temp_c\":"));
-  if (isnan(g_snap.oil_temp_c)) Serial.print(F("null"));
-  else Serial.print(g_snap.oil_temp_c, 1);
+  Serial.print(F(",\"oil_temp_f\":"));
+  if (isnan(g_snap.oil_temp_f)) Serial.print(F("null"));
+  else Serial.print(g_snap.oil_temp_f, 1);
 
   Serial.print(F(",\"ign_deg\":"));  Serial.print(g_snap.ign_deg, 2);
   Serial.print(F(",\"veh_kph\":"));  Serial.print(g_snap.veh_kph, 2);
