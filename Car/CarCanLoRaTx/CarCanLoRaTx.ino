@@ -98,29 +98,10 @@ static constexpr float    FUEL_R_PULLUP      = 10000.0f; // 10kΩ pull-up resist
 static constexpr float    FUEL_R25           = 10000.0f; // thermistor R at 25°C
 static constexpr float    FUEL_BETA          = 3950.0f;  // Beta constant (K)
 static constexpr float    FUEL_T0_K          = 298.15f;  // 25°C in Kelvin
-static constexpr float    FUEL_LOW_THRESH_V  = 1.64f;    // A1 voltage below this = fuel low
+static constexpr float    FUEL_LOW_THRESH_V  = 1.59f;    // A1 voltage below this = fuel low
 static constexpr uint32_t FUEL_LOW_DELAY_MS = 15000;    // must stay below threshold for this long before warning
 
-// =====================================================================
-//  OIL TEMPERATURE 2 — eBay universal 1/8 NPT sender (A3 / GP29)
-// =====================================================================
-// Oil temp 1 comes from the PE3 ECU via CAN (g_oil_temp1_c, decoded from 0x770 row 4).
-// Oil temp 2 is this external sender — second measurement point on the engine.
-// Variable resistance sender, range 0–150°C. Single-wire — signal on wire, ground
-// through threaded body into engine block. Engine block MUST share GND with RP2040.
-// Wiring: 3.3V → 1kΩ pull-up → A3 → signal wire → [sender body] → engine block → GND
-// CALIBRATION NEEDED: measure sender resistance at known temperatures and
-// fill in OIL2_CAL_TEMP[] / OIL2_CAL_OHMS[] below. Current values are estimates.
-static constexpr uint8_t  PIN_OIL_TEMP2      = A3;     // GP29
-static constexpr float    OIL2_R_PULLUP      = 1000.0f; // 1kΩ pull-up resistor
-
-// Calibration table — (resistance Ω → temperature °C). Add more points for accuracy.
-// TO CALIBRATE: measure V_adc at known temps, compute R = R_pullup * V_adc / (3.3 - V_adc)
-static constexpr int      OIL2_CAL_POINTS = 5;
-static constexpr float    OIL2_CAL_OHMS[OIL2_CAL_POINTS] = { 180.0f, 130.0f, 90.0f, 60.0f, 35.0f };
-static constexpr float    OIL2_CAL_TEMP[OIL2_CAL_POINTS] = {  30.0f,  60.0f, 90.0f, 120.0f, 150.0f };
-
-static constexpr uint32_t TEMP_PERIOD_MS = 250; // sample both temp sensors at 4 Hz
+static constexpr uint32_t TEMP_PERIOD_MS = 250; // sample fuel temp sensor at 4 Hz
 
 // =====================================================================
 //  MCP4725 DAC — Gear Indicator Output
@@ -170,7 +151,6 @@ static constexpr uint8_t GEAR_CONFIRM  = 4;
 // =====================================================================
 static constexpr uint8_t  IMU_ADDR      = 0x6A;
 static constexpr uint32_t IMU_PERIOD_MS  = 10;   // 100 Hz sample rate
-static constexpr uint32_t IMU_LORA_MS   = 100;  // 10 Hz LoRa transmit rate — LoRa time-on-air ~50ms/pkt so 100Hz saturates the link and starves CAN row frames (coolant/oil only appear in specific rows)
 static constexpr float    G0            = 9.80665f;
 static constexpr float    RAD2DEG       = 57.295779513f;
 
@@ -284,8 +264,6 @@ Adafruit_LSM6DSOX imu;
 bool     g_imuOk  = false;
 float    g_gbx=0, g_gby=0, g_gbz=0;
 uint32_t lastImuSend = 0;
-uint32_t lastImuTx   = 0;
-uint32_t g_imuSeq   = 0;
 float    g_ax=0, g_ay=0, g_az=1.0f;
 float    g_gx=0, g_gy=0, g_gz=0;
 
@@ -303,7 +281,6 @@ float   g_fuel_temp_c  = 0;    // fuel level sensor temp (°C) — PANW 103395-3
 float    g_fuel_voltage  = 0;    // raw A1 voltage (V) — used for fuel low threshold
 uint32_t g_fuelLowSince  = 0;    // millis() when voltage first dropped below threshold (0 = not low)
 float   g_oil_temp1_c  = 0;    // oil temp 1 (°C) — from PE3 ECU via CAN (0x770 row 4)
-float   g_oil_temp2_c  = 0;    // oil temp 2 (°C) — eBay sender on A3
 
 // SD state
 bool     g_sdOk      = false;
@@ -466,7 +443,7 @@ void printDecoded(const CanFrame &f) {
     Serial.print(F(" TPS=")); Serial.print(f.d[5]*0.391f,1); Serial.print('%');
     Serial.print(F(" IGN=")); Serial.print((int8_t)f.d[6]*1.365f,1); Serial.print(F("deg"));
     if (f.dlc>=8) {
-      if (row==3) { Serial.print(F(" CLT=")); Serial.print(f.d[7]-40); Serial.print('F'); }
+      if (row==3) { Serial.print(F(" CLT=")); Serial.print((f.d[7]-40)*9/5+32); Serial.print('F'); }
       if (row==4) { Serial.print(F(" OilT=")); Serial.print(f.d[7]-39); Serial.print('C'); }
       if (row==6) { Serial.print(F(" IAT=")); Serial.print(f.d[7]-40); Serial.print('C'); }
       if (row==9) { Serial.print(F(" Gear=")); Serial.print(f.d[7]); }
@@ -519,36 +496,18 @@ bool sendFrameBinary(const CanFrame &f) {
   return true;
 }
 
-void sendImuBinary(float ax, float ay, float az,
-                   float gx, float gy, float gz) {
-  uint8_t pkt[22] = {0};
-  pkt[0]=0xA5; pkt[1]=0x02;
-  g_imuSeq++;
-  put_u32_le(&pkt[2], g_imuSeq);
-  put_u32_le(&pkt[6], (uint32_t)millis());
-  put_i16_le(&pkt[10], (int16_t)(ax * 1000.0f));
-  put_i16_le(&pkt[12], (int16_t)(ay * 1000.0f));
-  put_i16_le(&pkt[14], (int16_t)(az * 1000.0f));
-  put_i16_le(&pkt[16], (int16_t)(gx * 10.0f));
-  put_i16_le(&pkt[18], (int16_t)(gy * 10.0f));
-  put_i16_le(&pkt[20], (int16_t)(gz * 10.0f));
-  canCsHigh();
-  rf95.send(pkt, sizeof(pkt));
-  rf95.waitPacketSent();
-}
 
-// Packet type 0x03 — analog sensors: steering angle, oil temp 2 (external sender)
-// Format: [0xA5][0x03][seq:4][ts:4][steer_ddeg:2][oil2_t_ddeg:2] = 14 bytes
-// Values scaled as int16 × 10 (0.1° / 0.1°C resolution)
+// Packet type 0x03 — analog sensors: steering angle
+// Format: [0xA5][0x03][seq:4][ts:4][steer_ddeg:2] = 12 bytes
+// steer_ddeg is int16 × 10 (0.1° resolution)
 void sendAnalogBinary() {
-  uint8_t pkt[14] = {0};
+  uint8_t pkt[12] = {0};
   static uint32_t analogSeq = 0;
   pkt[0] = 0xA5; pkt[1] = 0x03;
   analogSeq++;
   put_u32_le(&pkt[2], analogSeq);
   put_u32_le(&pkt[6], (uint32_t)millis());
-  put_i16_le(&pkt[10], (int16_t)(g_steer_deg   * 10.0f));
-  put_i16_le(&pkt[12], (int16_t)(g_oil_temp2_c * 10.0f));
+  put_i16_le(&pkt[10], (int16_t)(g_steer_deg * 10.0f));
   canCsHigh();
   rf95.send(pkt, sizeof(pkt));
   rf95.waitPacketSent();
@@ -635,27 +594,6 @@ void readFuelTemp() {
   g_fuel_temp_c = t_k - 273.15f;
 }
 
-// eBay oil temp 2 sender: linear interpolation through calibration table
-void readOilTemp2() {
-  int raw = analogRead(PIN_OIL_TEMP2);
-  float v_adc = raw * (3.3f / 4095.0f);
-  if (v_adc <= 0.01f || v_adc >= 3.29f) return;  // open/short circuit guard
-  float r_sender = OIL2_R_PULLUP * v_adc / (3.3f - v_adc);
-
-  // Clamp to table edges
-  if (r_sender >= OIL2_CAL_OHMS[0]) { g_oil_temp2_c = OIL2_CAL_TEMP[0]; return; }
-  if (r_sender <= OIL2_CAL_OHMS[OIL2_CAL_POINTS - 1]) { g_oil_temp2_c = OIL2_CAL_TEMP[OIL2_CAL_POINTS - 1]; return; }
-
-  // Find bracketing pair and interpolate
-  for (int i = 0; i < OIL2_CAL_POINTS - 1; i++) {
-    if (r_sender <= OIL2_CAL_OHMS[i] && r_sender >= OIL2_CAL_OHMS[i + 1]) {
-      float frac = (r_sender - OIL2_CAL_OHMS[i]) / (OIL2_CAL_OHMS[i + 1] - OIL2_CAL_OHMS[i]);
-      g_oil_temp2_c = OIL2_CAL_TEMP[i] + frac * (OIL2_CAL_TEMP[i + 1] - OIL2_CAL_TEMP[i]);
-      return;
-    }
-  }
-}
-
 // =====================================================================
 //  STEERING ANGLE
 // =====================================================================
@@ -683,7 +621,6 @@ void setup() {
   pinMode(PIN_NEUTRAL_SWITCH, INPUT_PULLUP);
   pinMode(PIN_STEER,     INPUT);
   pinMode(PIN_FUEL_TEMP, INPUT);
-  pinMode(PIN_OIL_TEMP2, INPUT);
   analogReadResolution(12);  // RP2040 12-bit ADC
 
   ledEngWarn.begin();  ledEngWarn.setBrightness(200);  ledEngWarn.clear();  ledEngWarn.show();
@@ -803,7 +740,6 @@ void loop() {
     Serial.print(F(" steer="));    Serial.print(g_steer_deg,1);   Serial.print(F("deg"));
     Serial.print(F(" fuel_t="));   Serial.print(g_fuel_temp_c,1);  Serial.print(F("C"));
     Serial.print(F(" oil_t1="));  Serial.print(g_oil_temp1_c,1); Serial.print(F("C"));
-    Serial.print(F(" oil_t2="));  Serial.print(g_oil_temp2_c,1); Serial.print(F("C"));
     Serial.print(F(" EFLG=0x")); Serial.print(eflg, HEX);
     if (eflg==0) Serial.print(F(" OK"));
     Serial.println();
@@ -822,12 +758,6 @@ void loop() {
     g_gz = g.gyro.z * RAD2DEG - g_gbz;
   }
 
-  // IMU LoRa transmit at 10 Hz — decoupled from sample rate to avoid saturating
-  // the link (each waitPacketSent() blocks ~50ms; 100Hz = link always busy)
-  if (g_imuOk && (now - lastImuTx >= IMU_LORA_MS)) {
-    lastImuTx = now;
-    sendImuBinary(g_ax, g_ay, g_az, g_gx, g_gy, g_gz);
-  }
 
   // SD log at 50 Hz
   if (now - lastSdLog >= 20UL) {
@@ -867,15 +797,14 @@ void loop() {
     readSteeringAngle();
   }
 
-  // Fuel temp + oil temp sample at 4 Hz
+  // Fuel temp sample at 4 Hz
   if (now - lastTempSample >= TEMP_PERIOD_MS) {
     lastTempSample = now;
     readFuelTemp();
-    readOilTemp2();
   }
 
-  // Transmit analog sensors (steering, fuel level temp, oil temp) at 10 Hz
-  if (now - lastAnalogTx >= 100UL) {
+  // Transmit analog sensors at 2 Hz — freed from 10 Hz to give LoRa budget to CAN frames
+  if (now - lastAnalogTx >= 500UL) {
     lastAnalogTx = now;
     sendAnalogBinary();
   }
@@ -890,10 +819,38 @@ void loop() {
   uint8_t intf = mcpRead(CANINTF);
   CanFrame f;
 
+  // LoRa rate limiting.
+  // 0x790: skipped (RPM duplicated in 0x770).
+  // 0x770: per-row rate limit — ECU cycles d[0] through ~6 rows; a single per-ID window
+  //        only ever forwards whichever row arrives first, starving coolant/oil temp/IAT.
+  //        1 Hz per row: ~6 rows × 50ms = 300ms/sec for 0x770.
+  // 0x771/0x772: 5 Hz (200ms) — pressure/lambda change quickly.
+  static uint32_t lastLora770row[16] = {0};
+  static uint32_t lastLora771 = 0, lastLora772 = 0;
+  static constexpr uint32_t CAN770_ROW_MS     = 1000; // 1 Hz per row
+  static constexpr uint32_t CAN_LORA_INTERVAL_MS = 200;  // 5 Hz for 771/772
+
   auto handleFrame = [&](uint8_t base, const char *label, uint8_t clearBit) {
     readRx(base, f);
     mcpBitMod(CANINTF, clearBit, 0x00);
     lastCanFrame = now;
+    updateTxSnapshot(f);
+
+    if (f.id == 0x790) return;
+
+    bool shouldSend = false;
+    if (f.id == 0x770) {
+      uint8_t row = (f.dlc > 0) ? (f.d[0] & 0x0F) : 0;
+      if ((now - lastLora770row[row]) >= CAN770_ROW_MS) {
+        lastLora770row[row] = now;
+        shouldSend = true;
+      }
+    } else if (f.id == 0x771) {
+      if ((now - lastLora771) >= CAN_LORA_INTERVAL_MS) { lastLora771 = now; shouldSend = true; }
+    } else if (f.id == 0x772) {
+      if ((now - lastLora772) >= CAN_LORA_INTERVAL_MS) { lastLora772 = now; shouldSend = true; }
+    }
+    if (!shouldSend) return;
 
     Serial.print(F("[TX] ")); Serial.print(label);
     Serial.print(F(" ID=0x")); Serial.print(f.id, HEX);
@@ -905,7 +862,6 @@ void loop() {
     }
     Serial.println();
     printDecoded(f);
-    updateTxSnapshot(f);
     sendFrameBinary(f);
   };
 

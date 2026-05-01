@@ -91,7 +91,7 @@ void updateSnapshot(uint32_t id, bool ext, uint8_t dlc, const uint8_t *d) {
     g_snap.tps_pct = d[5] * 0.391f;
     g_snap.ign_deg = (int8_t)d[6] * 1.365f;
     if (dlc >= 8) {
-      if (row == 3) g_snap.coolant_f  = d[7] - 40.0f;                          // ECU encodes in °F
+      if (row == 3) g_snap.coolant_f  = ((float)d[7] - 40.0f) * 9.0f/5.0f + 32.0f; // ECU encodes in °C
       else if (row == 4) g_snap.oil_temp_f = (d[7] - 39.0f) * 9.0f/5.0f + 32.0f; // ECU encodes in °C
       else if (row == 6) g_snap.air_f   = (d[7] - 40.0f) * 9.0f/5.0f + 32.0f;   // ECU encodes in °C
       else if (row == 9) g_snap.gear    = d[7];
