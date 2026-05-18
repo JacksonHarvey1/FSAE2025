@@ -1,16 +1,17 @@
 # YCP Formula SAE 2025 Telemetry System
 
-Real-time data acquisition for the York College Formula SAE program. The car-side stack reads Bosch MS4.3 (PE3 8400) CAN frames, adds IMU + calculated gear data, transmits packets over 915 MHz LoRa, mirrors the stream to a Raspberry Pi base station, and logs everything to SD and InfluxDB/Grafana for analysis.
+Real-time data acquisition for the York College Formula SAE program. The car-side stack reads Bosch MS4.3 (PE3 8400) CAN frames, calculates gear, samples IMU/steering/fuel inputs, transmits the active LoRa packet stream over 915 MHz, mirrors the stream to a Raspberry Pi base station, and logs local SD plus InfluxDB/Grafana data for analysis.
 
 ---
 
 ## Quick Start (Car-Focused)
 1. **Hardware** - Two Adafruit Feather RP2040 RFM boards (PID 5714), one on-car with MCP2515 CAN transceiver, LSM6DSOX IMU, MCP4725 DAC, and SPI SD breakout; the second Feather sits at the base station as the LoRa receiver. Terminate the car CAN bus at 500 kbps.
 2. **Libraries** - Install the Earle Philhower `arduino-pico` cores plus **RadioHead (RH_RF95)**, **SdFat**, **Adafruit LSM6DS**, **Adafruit Unified Sensor**, and **Adafruit BusIO**. Local copies live under `libraries/`.
-3. **On-car firmware** - Open `Car/CarCanLoRaTx/CarCanLoRaTx.ino`, confirm pin assignments/table below, set LoRa region (default 915 MHz @ 20 dBm), build, and flash. Keep the board still for the one-second gyro bias routine at boot.
-4. **Base-station firmware** - Flash `Car/CarLoRaRxToPi/CarLoRaRxToPi.ino` onto the second Feather. Connect via USB to the Pi (or a laptop) at 115200 baud to watch NDJSON output.
-5. **Pi ingest** - On the Raspberry Pi in the pit/dyno cart, run `Dyno/dyno_ingest_influx.py` for a lightweight logger or bring up the full Docker stack in `Dyno/stack/` (InfluxDB 2 + Grafana). Dash-only development can use `Dyno/Dyno_Final.py`.
-6. **Verify** - Use the serial console: `[STATUS]` and `[GCALC]` lines from the TX sketch, JSON from the RX sketch, and `test_json_serial.py` or `Dyno/dyno_simple.py` to sanity-check data before a run.
+3. **On-car telemetry firmware** - Open `Car/CarCanLoRaTx/CarCanLoRaTx.ino`, confirm pin assignments/table below, set LoRa region (default 915 MHz @ 17 dBm), build, and flash. Keep the board still for the gyro bias routine at boot.
+4. **Standalone dash firmware** - `Car/CarDash/CarDash.ino` is the dash-only CAN reader for gear DAC + warning LEDs when LoRa/SD/IMU logging is not needed.
+5. **Base-station firmware** - Flash `Car/CarLoRaRxToPi/CarLoRaRxToPi.ino` onto the second Feather. Connect via USB to the Pi (or a laptop) at 115200 baud to watch NDJSON output.
+6. **Pi ingest** - On the Raspberry Pi in the pit/dyno cart, run `Dyno/dyno_ingest_influx.py` for a lightweight logger or bring up the full Docker stack in `Dyno/stack/` (InfluxDB 2 + Grafana). Dash-only development can use `Dyno/Dyno_Final.py`.
+7. **Verify** - Use the serial console: `[STATUS]` and `[GCALC]` lines from the TX/dash sketches, JSON from the RX sketch, and `test_json_serial.py` or `Dyno/dyno_simple.py` to sanity-check data before a run.
 
 ---
 
@@ -19,6 +20,7 @@ Real-time data acquisition for the York College Formula SAE program. The car-sid
 FSAE2025/
 |-- Car/
 |   |-- CarCanLoRaTx/           # On-car CAN->LoRa transmitter (Feather RP2040 RFM)
+|   |-- CarDash/                # Standalone dash: CAN gear DAC + warning LEDs
 |   `-- CarLoRaRxToPi/          # Base-station LoRa receiver -> USB serial JSON
 |-- Dyno/                       # Pi ingest scripts, Dash UI, Docker stack, docs
 |   |-- DynoRP2040_MCP2515Wing/ # Optional dyno-only Feather CAN sketch
@@ -66,7 +68,7 @@ FSAE2025/
 | CAN | MCP2515 + TJA1050 (or similar) | 16 MHz crystal, configured for 500 kbps |
 | IMU | Adafruit LSM6DSOX | I2C @ 0x6A, sampled at 100 Hz |
 | Gear DAC | MCP4725 | I2C @ 0x60 (A0=GND). Output drives PE3 Analog #5 (0-5 V). |
-| Storage | SPI microSD breakout | Uses SdFat in shared SPI mode; logs at 100 Hz |
+| Storage | SPI microSD breakout | Uses SdFat in shared SPI mode; active TX logs at 50 Hz |
 | Sensors (Dyno) | Optional Feather RP2040 CAN + LSM6DSOX | See `Dyno/DynoRP2040_MCP2515Wing` |
 
 ### Feather RP2040 RFM Pin Map (Car TX)
@@ -79,32 +81,32 @@ FSAE2025/
 | RFM95 CS / INT / RST | 16 / 21 / 17 | RFM95 is on-board; RST toggled at boot |
 | SD CS | 25 | Initialize SD *before* the radio |
 | I2C SDA / SCL | 2 / 3 | IMU (0x6A) + DAC (0x60) |
-| Steering angle ADC | A0 (GP26) | 0–5 V pot → voltage divider → 0–3.3 V |
-| Fuel level thermistor | A1 (GP27) | 10 kΩ pull-up to 3.3 V (PANW 103395-395 NTC) |
-| Oil temp sender #2 | A3 (GP29) | 1 kΩ pull-up to 3.3 V (1/8 NPT universal sender) |
-| Engine warning LED | 7 | SK6812 NeoPixel — red if CLT > 105 °C (moved from 5; 5 = CAN CS) |
-| Oil pressure warning LED | 6 | SK6812 NeoPixel — red if oil < 10 psi while running |
-| Shift indicator LED | 9 | SK6812 NeoPixel — blue if RPM > 11 500 |
-| Low fuel warning LED | 10 | SK6812 NeoPixel — amber if fuel thermistor > 45 °C |
-| Neutral light LED | 11 | SK6812 NeoPixel — green when gear == 0 |
+| Steering angle ADC | A0 (GP26) | 0-5 V pot -> voltage divider -> 0-3.3 V |
+| Fuel level sensor | A1 (GP27) | Telemetry TX uses 10 kOhm pull-up + PANW 103395-395 NTC; dash sketch uses voltage threshold only |
+| Neutral switch input | 12 | `INPUT_PULLUP`; LOW = neutral |
+| Engine warning LED | 11 | SK6812 NeoPixel; red if CLT > 200 F |
+| Oil pressure warning LED | 7 | SK6812 NeoPixel in `CarCanLoRaTx`; red if oil < 30 psi |
+| Shift indicator LED | 9 | SK6812 NeoPixel; blue if RPM >= 13,000 |
+| Low fuel warning LED | 10 | SK6812 NeoPixel; amber after A1 stays below threshold for 15 s |
+| Neutral light LED | 6 | SK6812 NeoPixel; green when neutral switch is LOW or calculated gear is neutral |
 | On-board LED | LED_BUILTIN | Heartbeat / status blink |
 
 ---
 
 ### `Car/CarCanLoRaTx/CarCanLoRaTx.ino`
 * **CAN ingest** - Custom MCP2515 driver configures CNF1/2/3 for 500 kbps @ 16 MHz. Frames `0x770` / `0x771` / `0x772` / `0x790` are decoded to engineering units — see [Transmitted Data](#transmitted-data) below for the full field list.
-* **IMU pipeline** - LSM6DSOX is initialized at 104 Hz, gyro bias is averaged for one second on boot, and 100 Hz samples are converted to g and deg/s. `[IMU]` serial lines mirror each packet.
+* **IMU pipeline** - LSM6DSOX is initialized at 104 Hz, gyro bias is averaged for one second on boot, and 100 Hz samples are converted to g and deg/s for local SD logging.
 * **Gear detection + DAC** - `GEAR_BANDS` holds RPM/kph ratio bands with hysteresis and sample confirmation (4 consecutive matches) to avoid flapping. `MCP4725` outputs the midpoint voltages: Neutral 0.305 V, 1st 1.00 V, 2nd 1.70 V, 3rd 2.50 V, 4th 3.305 V, 5th 4.095 V. The DAC is forced to Neutral at boot so PE3 always sees a safe voltage.
-* **LoRa link** - RFM95 sends three binary packet types over 915 MHz @ 20 dBm (all little-endian):
+* **LoRa link** - RFM95 sends binary packets over 915 MHz @ 17 dBm (all little-endian). The lower transmit power avoids 3.3 V rail droop during radio bursts.
 
   | Type | Size | Header | Payload |
   |------|------|--------|---------|
   | `0x01` CAN frame | 24 B | `[0xA5][0x01][flags][dlc]` | `[id:4][ts_ms:4][data:8][seq:4]` |
-  | `0x02` IMU | 22 B | `[0xA5][0x02][seq:4][ts_ms:4]` | `[ax/ay/az × 0.001 g : 3×int16][gx/gy/gz × 0.1 °/s : 3×int16]` |
-  | `0x03` Analog | 14 B | `[0xA5][0x03][seq:4][ts_ms:4]` | `[steer × 0.1 ° : int16][oil_t2 × 0.1 °C : int16]` |
+  | `0x02` IMU | 22 B | `[0xA5][0x02][seq:4][ts_ms:4]` | `[ax/ay/az x 0.001 g : 3 x int16][gx/gy/gz x 0.1 deg/s : 3 x int16]`; supported by the RX/test harness, not currently emitted by `CarCanLoRaTx` |
+  | `0x03` Analog | 12 B | `[0xA5][0x03][seq:4][ts_ms:4]` | `[steer x 0.1 deg : int16]` |
 
-* **SD logging** - `LOG_####.CSV` files capture the following columns at 100 Hz using an 8 KB RAM buffer that flushes every second. SdFat runs in `SHARED_SPI` mode so the SD must be initialized before the radio.
-  `ts_ms, rpm, veh_kph, gear, tps_pct, map_kpa, ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps, steer_deg, fuel_temp_c, oil_temp1_c, oil_temp2_c`
+* **SD logging** - `LOG_####.CSV` files capture the following columns at 50 Hz using an 8 KB RAM buffer that flushes every second. SdFat runs in `SHARED_SPI` mode so the SD must be initialized before the radio.
+  `ts_s, rpm, gear, ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps, steer_deg`
 * **Serial diagnostics** - The sketch prints `[STATUS]`, `[GCALC]`, decoded CAN values, and IMU details. If MCP2515 reports `EFLG != 0`, the flag byte is shown for quick wiring debug.
 * **Build settings** - Board: `Adafruit Feather RP2040` (Earle Philhower core). Use 125 MHz CPU, 16 MB flash (2 MB sketch). Required libraries live in `libraries/` if you prefer `arduino-cli --libraries`. LoRa frequency/power are at the top of the file.
 
@@ -112,10 +114,18 @@ FSAE2025/
 
 ---
 
+### `Car/CarDash/CarDash.ino`
+* **Purpose** - Lightweight dash firmware for the Feather RP2040 + CAN FeatherWing when the car only needs local gear DAC and warning indicators. It does not initialize LoRa, SD, or the IMU.
+* **CAN inputs** - Reads Bosch `0x770` and `0x790` at 500 kbps for RPM, vehicle speed, and coolant temperature. Stale RPM/speed values are zeroed after a 500 ms CAN timeout.
+* **Outputs** - Drives the MCP4725 gear voltage table used by the PE3 Analog #5 input and the SK6812 warning LEDs. The neutral light uses a dedicated switch on GPIO 12 (`INPUT_PULLUP`, LOW = neutral).
+* **Dash thresholds** - Engine warning at CLT > 200 F, shift light at RPM >= 13,000, low fuel after A1 stays below 1.2 V for 15 s. Serial status prints every 5 s.
+
+---
+
 ### `Car/CarLoRaRxToPi/CarLoRaRxToPi.ino`
-* **Purpose** - Listens for the binary LoRa frames above, reconstructs the Bosch snapshot, and streams newline-delimited JSON (NDJSON) at 10 Hz over USB (115200 baud). IMU packets are emitted immediately with `"t":"imu"`.
-* **JSON fields (Bosch line)** - `pkt,rpm,veh_kph,tps_pct,map_kpa,map_ext_kpa,batt_v,coolant_c,air_c,oil_temp_c,lambda1,lambda2,fuel_psi,oil_psi,inj_ms,gear,rssi`.
-* **IMU JSON** - `{"t":"imu","pkt":<seq>,"ax_g":...,"gx_dps":...,"rssi":...}` at up to 100 Hz.
+* **Purpose** - Listens for the binary LoRa frames above, reconstructs the Bosch snapshot, and streams newline-delimited JSON (NDJSON) at 10 Hz over USB (115200 baud). IMU packets are supported and emitted immediately with `"t":"imu"` if a transmitter sends packet `0x02`.
+* **JSON fields (Bosch line)** - `pkt,rpm,veh_kph,tps_pct,map_kpa,map_ext_kpa,batt_v,coolant_f,air_f,oil_temp_f,ign_deg,lambda1,lambda2,fuel_psi,oil_psi,inj_ms,gear,rssi`.
+* **IMU JSON** - `{"t":"imu","pkt":<seq>,"ax_g":...,"gx_dps":...,"rssi":...}` for packet `0x02`.
 * **Heartbeat** - Lines starting with `#` provide uptime, packet counts, and last RSSI for shell scripts to monitor.
 * **Integration points** - `Dyno/dyno_ingest_influx.py`, `Dyno/dyno_simple.py`, and `Testing/test_json_serial.py` all expect this NDJSON stream.
 
@@ -123,7 +133,7 @@ FSAE2025/
 
 ## Transmitted Data
 
-All fields sent over LoRa in the three `0xA5` packet types. The same values are written to the SD card CSV and forwarded as JSON by `CarLoRaRxToPi`.
+Active car LoRa traffic uses `0xA5` packet types. `CarCanLoRaTx` currently emits raw CAN frames (`0x01`) and steering analog (`0x03`); `CarLoRaRxToPi` also supports IMU packet `0x02` for test transmitters or future TX firmware.
 
 ### Packet 0x01 — Bosch MS4.3 CAN Frames
 
@@ -161,21 +171,20 @@ Raw CAN frames from the four decoded IDs. The receiver reconstructs the snapshot
 | **Gyro Y (gy)** | int16 × 0.1 | °/s |
 | **Gyro Z (gz)** | int16 × 0.1 | °/s |
 
-Gyro bias is averaged over 1 second at boot and subtracted from every sample.
+Gyro bias is averaged over 1 second at boot and subtracted from every local SD sample. Packet `0x02` is decoded by the receiver but is not currently sent by the active `CarCanLoRaTx` sketch.
 
-### Packet 0x03 — Analog Sensors (50 Hz)
+### Packet 0x03 — Analog Sensors (2 Hz)
 
 | Field | Pin | Scaling | Units |
 |-------|-----|---------|-------|
 | **Steering angle** | A0 / GP26 | int16 × 0.1 | ° (neg = left) |
-| **Oil temp 2** | A3 / GP29 | int16 × 0.1 | °C |
 
 ### Calculated / Derived Fields (on-car, also logged to SD)
 
 | Field | Derivation |
 |-------|-----------|
 | **Gear (calculated)** | RPM ÷ km/h ratio matched against `GEAR_BANDS[5]` with 4-sample hysteresis |
-| **Fuel level** | A1 / GP27 thermistor — `FUEL_LOW_THRESH_C = 45 °C` threshold (thermal dispersion: hotter = fuel below sensor) |
+| **Fuel level** | A1 / GP27 voltage threshold. `CarCanLoRaTx`: `FUEL_LOW_THRESH_V = 1.52 V`; `CarDash`: `FUEL_LOW_THRESH_V = 1.2 V`. Both require 15 s continuously below threshold. |
 | **Gear DAC output** | `MCP4725` drives PE3 Analog #5: N=0.305 V, 1st=1.00 V, 2nd=1.70 V, 3rd=2.50 V, 4th=3.305 V, 5th=4.095 V |
 
 ### InfluxDB Schema
@@ -201,9 +210,9 @@ The ingest script (`Dyno/dyno_ingest_influx.py`) writes all fields to a single m
 | `lambda1` | 0x772 row 0 | λ |
 | `lambda2` | 0x772 row 0 | λ |
 | `batt_v` | 0x771 row 1 | V |
-| `coolant_c` | 0x770 row 3 | °C |
-| `oil_temp_c` | 0x770 row 4 | °C |
-| `air_c` | 0x770 row 6 | °C |
+| `coolant_f` | 0x770 row 3 | °F |
+| `oil_temp_f` | 0x770 row 4 | °F |
+| `air_f` | 0x770 row 6 | °F |
 | `gear` | 0x770 row 9 | 0–5 |
 | `fuel_psi` | 0x771 row 3 | psi |
 | `oil_psi` | 0x771 row 3 | psi |
@@ -230,11 +239,11 @@ from(bucket: "telemetry")
 
 | LED | Trigger |
 |-----|---------|
-| Engine warning (red) | CLT > 105 °C |
-| Oil pressure warning (red) | Oil < 10 psi while RPM > 1000 |
-| Low fuel (amber) | Fuel thermistor > 45 °C |
-| Shift indicator (blue) | RPM > 11 500 |
-| Neutral light (green) | Gear == 0 |
+| Engine warning (red) | CLT > 200 °F |
+| Oil pressure warning (red) | `CarCanLoRaTx` only: oil < 30 psi |
+| Low fuel (amber) | A1 below threshold for 15 s |
+| Shift indicator (blue) | RPM >= 13,000 |
+| Neutral light (green) | Neutral switch LOW in `CarDash`; calculated gear == 0 in `CarCanLoRaTx` |
 
 ---
 
@@ -255,7 +264,7 @@ from(bucket: "telemetry")
 ---
 
 ## Testing & Diagnostics (`Testing/`)
-* **CAN + LoRa harness** - `Testing/TransmitterCANTest/` and `Testing/ReciverCANTest/` form a loopback pair documented in `Testing/CANTest_README.md`. `TransmitterCANTest` generates synthetic waveforms and emits all three `0xA5` packet types (`0x01` CAN frames for 0x770/0x771/0x772/0x790, `0x02` IMU, `0x03` analog) using the exact binary format of `CarCanLoRaTx`, so the receiver can decode and validate every field without touching the car.
+* **CAN + LoRa harness** - `Testing/TransmitterCANTest/` and `Testing/ReciverCANTest/` form a loopback pair documented in `Testing/CANTest_README.md`. `TransmitterCANTest` generates synthetic waveforms for `0x01` CAN frames, `0x02` IMU, and the older 14-byte `0x03` analog packet that includes steering plus oil temp 2; the active car TX now sends the 12-byte steering-only `0x03` packet.
 * **Focused sketches** - `BoschDecodeTest`, `SDCardTest`, `AccelerometerAndGyro`, `SimpleCANTest`, `TransmitterTest`, etc., isolate each subsystem for bench validation.
 * **Python utilities** - `simple_serial_test.py`, `test_json_serial.py`, and `pyserialAccelerometerLogging.py` consume NDJSON or raw serial streams for quick plots and logging on a laptop.
 * **Recommended workflow** - Run the CAN/LoRa pair first, then `SDCardTest` with the actual SD breakout, finish with the full `CarCanLoRaTx` sketch on a bench harness before installing on the vehicle.

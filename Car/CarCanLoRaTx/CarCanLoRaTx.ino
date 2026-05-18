@@ -46,11 +46,11 @@ static constexpr uint8_t LED_RED = PIN_LED;
 
 #define LEDS_PER_PIN 1
 
-static constexpr uint8_t PIN_LED_ENG_WARN  = 7;   // moved from 5 — pin 5 is CAN FeatherWing CS
-static constexpr uint8_t PIN_LED_OIL_WARN  = 11;
-static constexpr uint8_t PIN_LED_SHIFT      = 6;
+static constexpr uint8_t PIN_LED_ENG_WARN  = 11;   // moved from 5 — pin 5 is CAN FeatherWing CS
+static constexpr uint8_t PIN_LED_OIL_WARN  = 7; //not real
+static constexpr uint8_t PIN_LED_SHIFT      = 9;
 static constexpr uint8_t PIN_LED_FUEL_WARN = 10;
-static constexpr uint8_t PIN_LED_NEUTRAL   = 9;
+static constexpr uint8_t PIN_LED_NEUTRAL   = 6;
 
 // Neutral switch input — wire neutral position sensor/switch to this pin and GND
 // INPUT_PULLUP: LOW = neutral, HIGH = in gear
@@ -98,7 +98,7 @@ static constexpr float    FUEL_R_PULLUP      = 10000.0f; // 10kΩ pull-up resist
 static constexpr float    FUEL_R25           = 10000.0f; // thermistor R at 25°C
 static constexpr float    FUEL_BETA          = 3950.0f;  // Beta constant (K)
 static constexpr float    FUEL_T0_K          = 298.15f;  // 25°C in Kelvin
-static constexpr float    FUEL_LOW_THRESH_V  = 1.59f;    // A1 voltage below this = fuel low
+static constexpr float    FUEL_LOW_THRESH_V  = 1.52f;    // A1 voltage below this = fuel low
 static constexpr uint32_t FUEL_LOW_DELAY_MS = 15000;    // must stay below threshold for this long before warning
 
 static constexpr uint32_t TEMP_PERIOD_MS = 250; // sample fuel temp sensor at 4 Hz

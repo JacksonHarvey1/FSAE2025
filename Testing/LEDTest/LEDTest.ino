@@ -6,10 +6,11 @@
 
 #define LEDS_PER_PIN 1
 
-const int LED_PINS[]  = {6, 7, 9, 10, 11};
-const int NUM_STRANDS = 5;
+const int LED_PINS[]  = {5, 6, 7, 9, 10, 11};
+const int NUM_STRANDS = 6;
 
 Adafruit_NeoPixel strands[NUM_STRANDS] = {
+  Adafruit_NeoPixel(LEDS_PER_PIN, 5,  NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(LEDS_PER_PIN, 6,  NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(LEDS_PER_PIN, 7,  NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(LEDS_PER_PIN, 9,  NEO_GRB + NEO_KHZ800),
